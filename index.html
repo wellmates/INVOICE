@@ -1025,12 +1025,20 @@ body {
 
       <!-- TAB: KAS -->
       <div id="cf-tab-cashflow">
-        <select id="cf-filter-month" onchange="renderCashflow()" style="width:100%;padding:10px 12px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:13px;outline:none;-webkit-appearance:none;margin-bottom:12px;font-family:'Inter',sans-serif">
+        <select id="cf-filter-month" onchange="renderCashflow()" style="width:100%;padding:10px 12px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:13px;outline:none;-webkit-appearance:none;margin-bottom:8px;font-family:'Inter',sans-serif">
           <option value="">📅 Semua Bulan</option>
         </select>
         <div class="stats-grid" style="grid-template-columns:1fr 1fr" id="cf-stats"></div>
         <div class="card">
-          <div class="card-title">💳 Riwayat Transaksi</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
+            <div class="card-title" style="margin-bottom:0">💳 Riwayat Transaksi</div>
+            <select id="cf-filter-type" onchange="renderCashflow()" style="flex:1;max-width:180px;padding:6px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:12px;outline:none;-webkit-appearance:none;font-family:'Inter',sans-serif">
+              <option value="">Pemasukan &amp; Belanja</option>
+              <option value="in">📥 Pemasukan</option>
+              <option value="belanja">🛒 Pengeluaran Belanja</option>
+              <option value="invoice">📤 Pengeluaran (Invoice)</option>
+            </select>
+          </div>
           <div id="cashflow-table"></div>
         </div>
       </div>
@@ -2311,6 +2319,7 @@ function saveOrder() {
     notes: d.notes,
     date: new Date().toISOString(),
     shop: { ...store.settings },
+    baseHpp,
     hpp: { hppPerPcs, totalHpp, breakdown },
   };
 
@@ -2608,7 +2617,7 @@ function openEditOrder() {
   document.getElementById('edit-address').value = o.address || '';
   document.getElementById('edit-product').value = o.product;
   document.getElementById('edit-base-price').value = o.base;
-  document.getElementById('edit-base-hpp').value = o.baseHpp || '';
+  document.getElementById('edit-base-hpp').value = o.baseHpp || o.hpp?.hppPerPcs || '';
   document.getElementById('edit-pay-status').value = o.payStatus;
   document.getElementById('edit-dp').value = o.dp || '';
   document.getElementById('edit-dp-group').style.display = o.payStatus === 'DP' ? 'flex' : 'none';
@@ -2718,6 +2727,8 @@ function saveEditOrder() {
 
   const idx = store.orders.findIndex(x=>x.id===o.id);
   if (idx < 0) return;
+  const newHppPerPcs = baseHpp > 0 ? baseHpp : (totalQty > 0 ? totalRevenue / totalQty * 0.5 : 0);
+  const newTotalHpp  = baseHpp > 0 ? baseHpp * totalQty : 0;
   store.orders[idx] = {
     ...o,
     customer,
@@ -2734,6 +2745,8 @@ function saveEditOrder() {
     dp,
     sisa,
     notes: document.getElementById('edit-notes').value,
+    baseHpp,
+    hpp: { hppPerPcs: newHppPerPcs, totalHpp: newTotalHpp, breakdown: { bahan: Math.round(baseHpp*0.55), sablon: Math.round(baseHpp*0.45), afdruk: 0 } },
   };
   currentDetailOrder = store.orders[idx];
   saveData();
@@ -2744,16 +2757,35 @@ function saveEditOrder() {
 }
 
 function deleteOrder(id) {
-  if (!confirm('Hapus order ini?')) return;
-  const o = store.orders.find(x => x.id === id);
-  if (o) {
-    store.cashflow = store.cashflow.filter(c => !c.desc.includes(o.invNo));
-  }
-  store.orders = store.orders.filter(x => x.id !== id);
-  saveData();
-  closeModal('detail-modal');
-  renderHistory();
-  setTimeout(() => toast('🗑️ Order berhasil dihapus!'), 300);
+  // Custom confirm karena window.confirm bisa diblokir di beberapa browser mobile
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  overlay.innerHTML = `
+    <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;max-width:320px;width:100%;box-shadow:var(--shadow-lg)">
+      <div style="font-size:32px;text-align:center;margin-bottom:12px">🗑️</div>
+      <div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:6px">Hapus Order?</div>
+      <div style="font-size:13px;color:var(--text-muted);text-align:center;margin-bottom:20px">Order dan data keuangan terkait akan dihapus permanen.</div>
+      <div style="display:flex;gap:10px">
+        <button id="del-cancel-btn" class="btn btn-outline flex-1">Batal</button>
+        <button id="del-confirm-btn" class="btn btn-danger flex-1">Hapus</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#del-cancel-btn').onclick = () => document.body.removeChild(overlay);
+  overlay.querySelector('#del-confirm-btn').onclick = () => {
+    document.body.removeChild(overlay);
+    const o = store.orders.find(x => x.id === id);
+    if (o) {
+      store.cashflow = store.cashflow.filter(c => !c.desc.includes(o.invNo));
+    }
+    store.orders = store.orders.filter(x => x.id !== id);
+    currentDetailOrder = null;
+    saveData();
+    closeModal('detail-modal');
+    renderHistory();
+    renderDashboard();
+    setTimeout(() => toast('🗑️ Order berhasil dihapus!'), 300);
+  };
 }
 
 function printDetailInvoice() {
@@ -2836,11 +2868,11 @@ function renderCashflow() {
     const [fy, fm] = filterMonth.split('-').map(Number);
     cfAll = cfAll.filter(c => { const d = new Date(c.date); return d.getFullYear()===fy && d.getMonth()+1===fm; });
   }
-  // Feed: cashflow IN semua tampil, cashflow OUT yang HPP disembunyikan dari feed
-  const cfFeed = cfAll.filter(c => !(c.type === 'out' && c.desc.startsWith('HPP')));
-  const cf = [...cfFeed].reverse();
+  // Feed: semua cashflow tampil termasuk HPP invoice (bisa diedit/dihapus)
+  const cf = [...cfAll].reverse();
   const totalIn  = cfAll.filter(c => c.type === 'in').reduce((a, c) => a + c.amount, 0);
   const totalOut = cfAll.filter(c => c.type === 'out').reduce((a, c) => a + c.amount, 0);
+  const totalHppOrders = store.orders.reduce((a, o) => a + (o.hpp?.totalHpp || 0), 0);
 
   // Belanja total (all time — berdiri sendiri, tidak difilter bulan agar konsisten)
   const totalBelanja = store.belanja.reduce((a, x) => a + x.amount, 0);
@@ -2860,7 +2892,7 @@ function renderCashflow() {
     </div>
     <div class="stat-card">
       <div class="stat-icon" style="background:#FEF2F2">📤</div>
-      <div class="stat-value" style="font-size:14px;color:var(--danger)">${fmtRp(totalOut)}</div>
+      <div class="stat-value" style="font-size:14px;color:var(--danger)">${fmtRp(totalHppOrders)}</div>
       <div class="stat-label">Pengeluaran (Invoice)</div>
     </div>
     <div class="stat-card">
@@ -2893,19 +2925,23 @@ function renderCashflow() {
   // Build unified feed: cashflow + hutang + piutang + belanja
   const feedItems = [];
 
-  cf.forEach(c => feedItems.push({
-    _date: c.date, _ts: new Date(c.date).getTime(),
-    icon: c.type === 'in' ? '📥' : '📤',
-    label: c.desc,
-    sub: `${new Date(c.date).toLocaleDateString('id-ID')} • ${c.category}`,
-    amountStr: `${c.type === 'in' ? '+' : '-'}${fmtRp(c.amount)}`,
-    amountClass: c.type === 'in' ? 'cf-in' : 'cf-out',
-    action: `<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="openEditCashflow(${c.id})">✏️</button><button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="deleteCashflow(${c.id})">🗑️</button></div>`,
-    tag: `<span style="font-size:10px;background:var(--brand-light);color:var(--brand);padding:2px 6px;border-radius:4px;font-weight:700">KAS</span>`,
-  }));
+  cf.forEach(c => {
+    const isInvoiceIn = c.type === 'in' && (c.desc.includes('Lunas') || c.desc.includes('DP ke') || c.desc.includes('Pelunasan'));
+    feedItems.push({
+      _date: c.date, _ts: new Date(c.date).getTime(),
+      _typeKey: isInvoiceIn ? 'in' : (c.type === 'in' ? 'in' : 'kas-out'),
+      icon: c.type === 'in' ? '📥' : '📤',
+      label: c.desc,
+      sub: `${new Date(c.date).toLocaleDateString('id-ID')} • ${c.category}`,
+      amountStr: `${c.type === 'in' ? '+' : '-'}${fmtRp(c.amount)}`,
+      amountClass: c.type === 'in' ? 'cf-in' : 'cf-out',
+      action: `<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="openEditCashflow(${c.id})">✏️</button><button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="deleteCashflow(${c.id})">🗑️</button></div>`,
+      tag: `<span style="font-size:10px;background:var(--brand-light);color:var(--brand);padding:2px 6px;border-radius:4px;font-weight:700">KAS</span>`,
+    });
+  });
 
   store.hutang.forEach(x => feedItems.push({
-    _ts: new Date(x.date).getTime(),
+    _ts: new Date(x.date).getTime(), _typeKey: 'hutang',
     icon: x.lunas ? '✅' : '🔴',
     label: `Hutang — ${x.pihak}`,
     sub: `${new Date(x.date).toLocaleDateString('id-ID')}${x.desc ? ' • ' + x.desc : ''}`,
@@ -2916,7 +2952,7 @@ function renderCashflow() {
   }));
 
   store.piutang.forEach(x => feedItems.push({
-    _ts: new Date(x.date).getTime(),
+    _ts: new Date(x.date).getTime(), _typeKey: 'piutang',
     icon: x.lunas ? '✅' : '🟢',
     label: `Piutang — ${x.pihak}`,
     sub: `${new Date(x.date).toLocaleDateString('id-ID')}${x.desc ? ' • ' + x.desc : ''}`,
@@ -2927,7 +2963,7 @@ function renderCashflow() {
   }));
 
   store.belanja.forEach(x => feedItems.push({
-    _ts: new Date(x.date).getTime(),
+    _ts: new Date(x.date).getTime(), _typeKey: 'belanja',
     icon: x.jenis === 'bahan' ? '🧵' : '🎨',
     label: x.desc,
     sub: `${new Date(x.date).toLocaleDateString('id-ID')} • ${x.jenis === 'bahan' ? 'Belanja Bahan' : 'Belanja Sablon'}`,
@@ -2937,10 +2973,40 @@ function renderCashflow() {
     tag: `<span style="font-size:10px;background:#FFF7ED;color:var(--accent);padding:2px 6px;border-radius:4px;font-weight:700">BELANJA</span>`,
   }));
 
+  // Invoice: HPP produksi dari setiap order
+  store.orders.forEach(o => {
+    const totalHpp = o.hpp?.totalHpp || 0;
+    if (totalHpp <= 0) return;
+    feedItems.push({
+      _ts: new Date(o.date).getTime(), _typeKey: 'invoice',
+      icon: '🧾',
+      label: `HPP Produksi — ${o.invNo} (${o.customer})`,
+      sub: `${new Date(o.date).toLocaleDateString('id-ID')} • ${o.product} • ${o.totalQty} pcs`,
+      amountStr: `-${fmtRp(totalHpp)}`,
+      amountClass: 'cf-out',
+      action: '',
+      tag: `<span style="font-size:10px;background:#FEF2F2;color:var(--danger);padding:2px 6px;border-radius:4px;font-weight:700">INVOICE</span>`,
+    });
+  });
+
   // Sort newest first
   feedItems.sort((a, b) => b._ts - a._ts);
 
-  document.getElementById('cashflow-table').innerHTML = feedItems.map(item => `
+  // Filter by type
+  const filterType = document.getElementById('cf-filter-type')?.value || '';
+  let filteredItems = feedItems;
+  if (filterType === 'in') {
+    filteredItems = feedItems.filter(item => item._typeKey === 'in');
+  } else if (filterType === 'belanja') {
+    filteredItems = feedItems.filter(item => item._typeKey === 'belanja');
+  } else if (filterType === 'invoice') {
+    filteredItems = feedItems.filter(item => item._typeKey === 'invoice');
+  } else {
+    // Default: Pemasukan + Pengeluaran Belanja (tanpa invoice)
+    filteredItems = feedItems.filter(item => item._typeKey === 'in' || item._typeKey === 'belanja' || item._typeKey === 'hutang' || item._typeKey === 'piutang');
+  }
+
+  document.getElementById('cashflow-table').innerHTML = filteredItems.map(item => `
     <div class="cf-item">
       <div style="font-size:20px;flex-shrink:0">${item.icon}</div>
       <div style="flex:1;min-width:0">
@@ -2979,10 +3045,27 @@ function saveCashflow() {
 }
 
 function deleteCashflow(id) {
-  store.cashflow = store.cashflow.filter(c => c.id !== id);
-  saveData();
-  renderCashflow();
-  setTimeout(() => toast('🗑️ Transaksi dihapus!'), 150);
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  overlay.innerHTML = `
+    <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;max-width:320px;width:100%;box-shadow:var(--shadow-lg)">
+      <div style="font-size:32px;text-align:center;margin-bottom:12px">🗑️</div>
+      <div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:6px">Hapus Transaksi?</div>
+      <div style="font-size:13px;color:var(--text-muted);text-align:center;margin-bottom:20px">Entri transaksi ini akan dihapus permanen.</div>
+      <div style="display:flex;gap:10px">
+        <button id="dcf-cancel" class="btn btn-outline flex-1">Batal</button>
+        <button id="dcf-confirm" class="btn btn-danger flex-1">Hapus</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#dcf-cancel').onclick = () => document.body.removeChild(overlay);
+  overlay.querySelector('#dcf-confirm').onclick = () => {
+    document.body.removeChild(overlay);
+    store.cashflow = store.cashflow.filter(c => c.id !== id);
+    saveData();
+    renderCashflow();
+    setTimeout(() => toast('🗑️ Transaksi dihapus!'), 150);
+  };
 }
 
 function openEditCashflow(id) {
