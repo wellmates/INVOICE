@@ -1,78 +1,48 @@
 {
-  "name": "SablonPro — Kalkulator HPP & Invoice",
-  "short_name": "SablonPro",
-  "description": "Aplikasi kalkulator HPP, invoice, dan manajemen order untuk usaha sablon",
-  "start_url": "./index.html",
+  "name": "Invoice Wellmates",
+  "short_name": "Invoice",
+  "description": "Aplikasi invoice dan billing untuk manajemen pesanan",
+  "start_url": "/INVOICE/",
+  "scope": "/INVOICE/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#F8FAFC",
-  "theme_color": "#4F46E5",
-  "lang": "id",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "lang": "id-ID",
   "icons": [
     {
-      "src": "icons/icon-72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-192.png",
+      "src": "/INVOICE/img/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "icons/icon-384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-512.png",
+      "src": "/INVOICE/img/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
-  "categories": ["business", "productivity", "utilities"],
+  "screenshots": [
+    {
+      "src": "/INVOICE/img/icon-192.png",
+      "sizes": "192x192",
+      "form_factor": "narrow"
+    }
+  ],
+  "categories": ["productivity", "business"],
   "shortcuts": [
     {
-      "name": "Order Baru",
-      "short_name": "Order",
-      "description": "Buat order baru",
-      "url": "./index.html#order",
-      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Riwayat Order",
-      "short_name": "Riwayat",
-      "description": "Lihat riwayat order",
-      "url": "./index.html#history",
-      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+      "name": "Buat Invoice",
+      "short_name": "Invoice",
+      "description": "Buat invoice baru dengan cepat",
+      "url": "/INVOICE/",
+      "icons": [
+        {
+          "src": "/INVOICE/img/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
