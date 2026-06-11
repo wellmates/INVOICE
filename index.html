@@ -1523,6 +1523,105 @@ body {
   </div>
 </div>
 
+<!-- EDIT BELANJA MODAL -->
+<div class="modal-overlay" id="edit-belanja-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">✏️ Edit Belanja</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('edit-belanja-modal')">✕</button>
+    </div>
+    <input type="hidden" id="ebel-id">
+    <div class="form-grid">
+      <div class="form-group form-full">
+        <label>Jenis Belanja</label>
+        <select id="ebel-jenis">
+          <option value="bahan">🧵 Belanja Bahan</option>
+          <option value="sablon">🎨 Belanja Kebutuhan Sablon</option>
+        </select>
+      </div>
+      <div class="form-group form-full">
+        <label>Keterangan</label>
+        <input type="text" id="ebel-desc" placeholder="Cotton combed 30s, tinta sablon, dll...">
+      </div>
+      <div class="form-group">
+        <label>Jumlah (Rp)</label>
+        <input type="number" inputmode="numeric" id="ebel-amount" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Tanggal</label>
+        <input type="date" id="ebel-date">
+      </div>
+    </div>
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-outline flex-1" onclick="closeModal('edit-belanja-modal')">Batal</button>
+      <button class="btn btn-primary flex-1" onclick="saveEditBelanja()">💾 Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT HUTANG / PIUTANG MODAL -->
+<div class="modal-overlay" id="edit-hp-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="ehp-modal-title">✏️ Edit Hutang</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('edit-hp-modal')">✕</button>
+    </div>
+    <input type="hidden" id="ehp-id">
+    <input type="hidden" id="ehp-type">
+    <div class="form-grid">
+      <div class="form-group form-full">
+        <label id="ehp-pihak-label">Kepada (nama orang/toko)</label>
+        <input type="text" id="ehp-pihak" placeholder="Toko Bahan Jaya...">
+      </div>
+      <div class="form-group form-full">
+        <label>Keterangan</label>
+        <input type="text" id="ehp-desc" placeholder="Beli bahan 5 kodi...">
+      </div>
+      <div class="form-group">
+        <label>Jumlah (Rp)</label>
+        <input type="number" inputmode="numeric" id="ehp-amount" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Tanggal</label>
+        <input type="date" id="ehp-date">
+      </div>
+      <div class="form-group form-full">
+        <label>Jatuh Tempo (opsional)</label>
+        <input type="date" id="ehp-due">
+      </div>
+    </div>
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-outline flex-1" onclick="closeModal('edit-hp-modal')">Batal</button>
+      <button class="btn btn-primary flex-1" onclick="saveEditHP()">💾 Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT HPP INVOICE MODAL -->
+<div class="modal-overlay" id="edit-invoice-hpp-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">✏️ Edit HPP Invoice</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('edit-invoice-hpp-modal')">✕</button>
+    </div>
+    <input type="hidden" id="einv-id">
+    <div style="background:var(--bg);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--text-secondary);font-weight:600" id="einv-info"></div>
+    <div class="form-grid">
+      <div class="form-group form-full">
+        <label>Total HPP Produksi (Rp)</label>
+        <input type="number" inputmode="numeric" id="einv-hpp" placeholder="0">
+      </div>
+    </div>
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-outline flex-1" onclick="closeModal('edit-invoice-hpp-modal')">Batal</button>
+      <button class="btn btn-primary flex-1" onclick="saveEditInvoiceHpp()">💾 Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -2984,7 +3083,7 @@ function renderCashflow() {
       sub: `${new Date(o.date).toLocaleDateString('id-ID')} • ${o.product} • ${o.totalQty} pcs`,
       amountStr: `-${fmtRp(totalHpp)}`,
       amountClass: 'cf-out',
-      action: '',
+      action: `<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="openEditInvoiceHpp(${o.id})">✏️</button><button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="deleteInvoiceHpp(${o.id})">🗑️</button></div>`,
       tag: `<span style="font-size:10px;background:#FEF2F2;color:var(--danger);padding:2px 6px;border-radius:4px;font-weight:700">INVOICE</span>`,
     });
   });
@@ -3159,6 +3258,97 @@ function deleteHP(type, id) {
   setTimeout(() => toast(`🗑️ ${type === 'hutang' ? 'Hutang' : 'Piutang'} dihapus!`), 150);
 }
 
+function openEditHP(type, id) {
+  const arr = type === 'hutang' ? store.hutang : store.piutang;
+  const item = arr.find(x => x.id === id);
+  if (!item) return;
+  document.getElementById('ehp-id').value = id;
+  document.getElementById('ehp-type').value = type;
+  document.getElementById('ehp-modal-title').textContent = type === 'hutang' ? '✏️ Edit Hutang' : '✏️ Edit Piutang';
+  document.getElementById('ehp-pihak-label').textContent = type === 'hutang' ? 'Kepada (nama orang/toko)' : 'Dari (nama orang/pelanggan)';
+  document.getElementById('ehp-pihak').value = item.pihak;
+  document.getElementById('ehp-desc').value = item.desc || '';
+  document.getElementById('ehp-amount').value = item.amount;
+  document.getElementById('ehp-date').value = item.date;
+  document.getElementById('ehp-due').value = item.due || '';
+  openModal('edit-hp-modal');
+}
+
+function saveEditHP() {
+  const id = parseInt(document.getElementById('ehp-id').value);
+  const type = document.getElementById('ehp-type').value;
+  const pihak = document.getElementById('ehp-pihak').value;
+  const amount = parseFloat(document.getElementById('ehp-amount').value);
+  const desc = document.getElementById('ehp-desc').value;
+  if (!amount || !pihak) { toast('⚠️ Isi nama dan jumlah!'); return; }
+  const arr = type === 'hutang' ? store.hutang : store.piutang;
+  const idx = arr.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  arr[idx] = {
+    ...arr[idx],
+    pihak,
+    desc,
+    amount,
+    date: document.getElementById('ehp-date').value,
+    due: document.getElementById('ehp-due').value,
+  };
+  saveData();
+  closeModal('edit-hp-modal');
+  if (type === 'hutang') renderHutang();
+  else renderPiutang();
+  setTimeout(() => toast(`✅ ${type === 'hutang' ? 'Hutang' : 'Piutang'} berhasil diperbarui!`), 300);
+}
+
+// ===================================================
+// EDIT / DELETE HPP INVOICE
+// ===================================================
+function openEditInvoiceHpp(orderId) {
+  const order = store.orders.find(o => o.id === orderId);
+  if (!order) return;
+  document.getElementById('einv-id').value = orderId;
+  document.getElementById('einv-info').textContent = `${order.invNo} — ${order.customer} (${order.product}, ${order.totalQty} pcs)`;
+  document.getElementById('einv-hpp').value = order.hpp?.totalHpp || 0;
+  openModal('edit-invoice-hpp-modal');
+}
+
+function saveEditInvoiceHpp() {
+  const orderId = parseInt(document.getElementById('einv-id').value);
+  const newHpp = parseFloat(document.getElementById('einv-hpp').value);
+  if (!newHpp || newHpp < 0) { toast('⚠️ Masukkan nilai HPP yang valid!'); return; }
+  const idx = store.orders.findIndex(o => o.id === orderId);
+  if (idx < 0) return;
+  store.orders[idx].hpp = { ...store.orders[idx].hpp, totalHpp: newHpp };
+  saveData();
+  closeModal('edit-invoice-hpp-modal');
+  renderCashflow();
+  setTimeout(() => toast('✅ HPP Invoice berhasil diperbarui!'), 300);
+}
+
+function deleteInvoiceHpp(orderId) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  overlay.innerHTML = `
+    <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;max-width:320px;width:100%;box-shadow:var(--shadow-lg)">
+      <div style="font-size:32px;text-align:center;margin-bottom:12px">🗑️</div>
+      <div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:6px">Hapus HPP Invoice?</div>
+      <div style="font-size:13px;color:var(--text-muted);text-align:center;margin-bottom:20px">Nilai HPP produksi pada invoice ini akan dihapus. Order tetap ada.</div>
+      <div style="display:flex;gap:10px">
+        <button id="dinv-cancel" class="btn btn-outline flex-1">Batal</button>
+        <button id="dinv-confirm" class="btn btn-danger flex-1">Hapus</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#dinv-cancel').onclick = () => document.body.removeChild(overlay);
+  overlay.querySelector('#dinv-confirm').onclick = () => {
+    document.body.removeChild(overlay);
+    const idx = store.orders.findIndex(o => o.id === orderId);
+    if (idx >= 0) { store.orders[idx].hpp = { ...store.orders[idx].hpp, totalHpp: 0 }; }
+    saveData();
+    renderCashflow();
+    setTimeout(() => toast('🗑️ HPP Invoice dihapus!'), 150);
+  };
+}
+
 function renderHPList(type) {
   const arr = type === 'hutang' ? store.hutang : store.piutang;
   const statsEl = document.getElementById(type + '-stats');
@@ -3193,6 +3383,7 @@ function renderHPList(type) {
           <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${color}">${fmtRp(x.amount)}</div>
           <div style="display:flex;gap:4px">
             <button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px" onclick="toggleLunas('${type}',${x.id})">${x.lunas ? 'Buka' : 'Lunas'}</button>
+            <button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="openEditHP('${type}',${x.id})">✏️</button>
             <button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="deleteHP('${type}',${x.id})">🗑️</button>
           </div>
         </div>
@@ -3235,6 +3426,37 @@ function deleteBelanja(id) {
   saveData();
   renderBelanja();
   setTimeout(() => toast('🗑️ Belanja dihapus!'), 150);
+}
+
+function openEditBelanja(id) {
+  const item = store.belanja.find(x => x.id === id);
+  if (!item) return;
+  document.getElementById('ebel-id').value = id;
+  document.getElementById('ebel-jenis').value = item.jenis;
+  document.getElementById('ebel-desc').value = item.desc;
+  document.getElementById('ebel-amount').value = item.amount;
+  document.getElementById('ebel-date').value = item.date;
+  openModal('edit-belanja-modal');
+}
+
+function saveEditBelanja() {
+  const id = parseInt(document.getElementById('ebel-id').value);
+  const amount = parseFloat(document.getElementById('ebel-amount').value);
+  const desc = document.getElementById('ebel-desc').value;
+  if (!amount || !desc) { toast('⚠️ Isi keterangan dan jumlah!'); return; }
+  const idx = store.belanja.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  store.belanja[idx] = {
+    ...store.belanja[idx],
+    jenis: document.getElementById('ebel-jenis').value,
+    desc,
+    amount,
+    date: document.getElementById('ebel-date').value,
+  };
+  saveData();
+  closeModal('edit-belanja-modal');
+  renderBelanja();
+  setTimeout(() => toast('✅ Belanja berhasil diperbarui!'), 300);
 }
 
 function renderBelanja() {
@@ -3299,7 +3521,10 @@ function renderBelanja() {
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--accent)">-${fmtRp(x.amount)}</div>
-          <button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="deleteBelanja(${x.id})">🗑️</button>
+          <div style="display:flex;gap:4px;justify-content:flex-end;margin-top:2px">
+            <button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="openEditBelanja(${x.id})">✏️</button>
+            <button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="deleteBelanja(${x.id})">🗑️</button>
+          </div>
         </div>
       </div>`).join('');
   }
@@ -3314,7 +3539,10 @@ function renderBelanja() {
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--brand)">-${fmtRp(x.amount)}</div>
-          <button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="deleteBelanja(${x.id})">🗑️</button>
+          <div style="display:flex;gap:4px;justify-content:flex-end;margin-top:2px">
+            <button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="openEditBelanja(${x.id})">✏️</button>
+            <button class="btn btn-ghost btn-icon btn-sm" style="padding:2px;font-size:14px" onclick="deleteBelanja(${x.id})">🗑️</button>
+          </div>
         </div>
       </div>`).join('');
   }
