@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="id" data-theme="light">
 <head>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./img/icon-192.png">
+<link rel="apple-touch-icon" href="./img/icon-512.png">
+<meta name="theme-color" content="#2563eb">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1835,10 +1839,10 @@ function saveSettings() {
 // PRODUK TYPE & CUTTING
 // ===================================================
 const CUTTING_MAP = {
-  'Kaos':      ['Reguler','Boxy','Oversize'],
-  'Jaket':     ['Reguler','Oversize'],
-  'Workshirt': ['Reguler','Slim'],
-  'Workjacket':['Reguler','Oversize'],
+  'KAOS':      ['Reguler','Boxy','Oversize','Custom'],
+  'JAKET':     ['Reguler','Boxy','Oversize','Custom'],
+  'WORKSHIRT': ['Reguler','Boxy','Oversize','Custom'],
+  'CELANA':['Reguler','Custom'],
 };
 let currentProduk = 'Kaos';
 let currentCutting = 'Reguler';
