@@ -1346,9 +1346,13 @@ body {
           <option value="Lunas">✅ Lunas</option>
         </select>
       </div>
-      <div class="form-group" id="edit-dp-group" style="display:none">
-        <label>Jumlah DP Awal (Rp)</label>
-        <input type="number" inputmode="numeric" id="edit-dp" placeholder="0">
+      <div class="form-group form-full" id="edit-dp-group" style="display:none">
+        <label>Riwayat Pembayaran</label>
+        <div id="edit-dp-inline-list" style="margin-bottom:6px"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" inputmode="numeric" id="edit-dp" placeholder="Jumlah DP awal (Rp)" style="flex:1">
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">💡 Edit nominal langsung di atas, lalu Simpan</div>
       </div>
       <div class="form-group form-full">
         <label>Catatan Produksi</label>
@@ -1713,22 +1717,21 @@ function saveData() {
 // ===================================================
 const pageTitles = { dashboard: 'Dashboard', order: 'Order Baru', history: 'Riwayat Order', cashflow: 'Keuangan' };
 function navigate(page) {
+  try {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item[id]').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + page).classList.add('active');
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
   const navEl = document.getElementById('nav-' + page);
   if (navEl) navEl.classList.add('active');
-  // Topbar always shows shop name
-  document.getElementById('topbar-title').textContent = store.settings.shopname || 'SablonPro';
-  if (page === 'dashboard') renderDashboard();
-  if (page === 'history') renderHistory();
-  if (page === 'cashflow') renderCashflow();
-  // Scroll to top — cover all cases including iOS Safari
+  const titleEl = document.getElementById('topbar-title');
+  if (titleEl) titleEl.textContent = (store.settings && store.settings.shopname) || 'SablonPro';
+  if (page === 'dashboard') { try { renderDashboard(); } catch(e) { console.error('renderDashboard error:', e); } }
+  if (page === 'history')   { try { renderHistory();   } catch(e) { console.error('renderHistory error:', e);   } }
+  if (page === 'cashflow')  { try { renderCashflow();  } catch(e) { console.error('renderCashflow error:', e);  } }
   try { document.querySelector('.content').scrollTop = 0; } catch(e) {}
-  try { document.querySelector('.content').scrollTo(0, 0); } catch(e) {}
   try { window.scrollTo(0, 0); } catch(e) {}
-  try { document.body.scrollTop = 0; } catch(e) {}
-  try { document.documentElement.scrollTop = 0; } catch(e) {}
+  } catch(e) { console.error('navigate error:', e); }
 }
 
 // ===================================================
@@ -1844,8 +1847,8 @@ function saveSettings() {
   saveData();
   toast('✅ Pengaturan tersimpan!', 'success');
   closeModal('settings-modal');
-  updateTopbarLogo();
-  recalculate();
+  try { updateTopbarLogo(); } catch(e) {}
+  try { recalculate(); } catch(e) {}
 }
 
 // ===================================================
@@ -2179,10 +2182,11 @@ function buildA4Invoice(d) {
   const statusColor = d.payStatus === 'Lunas' ? '#059669' : d.payStatus === 'DP' ? '#D97706' : '#DC2626';
   const statusBg   = d.payStatus === 'Lunas' ? '#ECFDF5' : d.payStatus === 'DP' ? '#FFFBEB' : '#FEF2F2';
 
+  const shop = d.shop || {};
   const shopLines = [
-    d.shop.field     ? `<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:1px">${d.shop.field}</div>` : '',
-    d.shop.address   ? `<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:1px">📍 ${d.shop.address}</div>` : '',
-    (d.shop.phone || d.shop.email) ? `<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:1px">${[d.shop.phone ? '📞 '+d.shop.phone : '', d.shop.email ? '✉️ '+d.shop.email : ''].filter(Boolean).join('  ')}</div>` : '',
+    shop.field     ? `<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:1px">${shop.field}</div>` : '',
+    shop.address   ? `<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:1px">📍 ${shop.address}</div>` : '',
+    (shop.phone || shop.email) ? `<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:1px">${[shop.phone ? '📞 '+shop.phone : '', shop.email ? '✉️ '+shop.email : ''].filter(Boolean).join('  ')}</div>` : '',
   ].join('');
 
   const paymentBlock = () => {
@@ -2223,7 +2227,7 @@ function buildA4Invoice(d) {
     return `<div style="margin-top:4px;font-size:10px;font-weight:700;color:#FCA5A5">⏳ BELUM BAYAR</div>`;
   };
 
-  const rekeningBlock = d.shop.bankNo ? `
+  const rekeningBlock = shop.bankNo ? `
     <div style="margin-top:8px;border:1.5px solid #1E1B4B;border-radius:7px;overflow:hidden">
       <div style="background:#1E1B4B;padding:6px 10px">
         <div style="color:#fff;font-size:10px;font-weight:700;letter-spacing:.5px">💳 INFORMASI PEMBAYARAN</div>
@@ -2231,10 +2235,10 @@ function buildA4Invoice(d) {
       <div style="padding:8px 10px;background:#F8FAFC">
         <div style="font-size:9px;color:#64748B;margin-bottom:8px;line-height:1.5">Pembayaran transaksi ini bisa dilakukan melalui tunai atau transfer melalui rekening bank di bawah ini.</div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="background:#1E1B4B;color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;flex-shrink:0">${d.shop.bankName || 'BANK'}</div>
+          <div style="background:#1E1B4B;color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;flex-shrink:0">${shop.bankName || 'BANK'}</div>
           <div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#0F172A;letter-spacing:1px">${d.shop.bankNo}</div>
-            <div style="font-size:9px;color:#64748B;margin-top:1px">a/n <strong>${d.shop.bankOwner || d.shop.shopname}</strong></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#0F172A;letter-spacing:1px">${shop.bankNo}</div>
+            <div style="font-size:9px;color:#64748B;margin-top:1px">a/n <strong>${shop.bankOwner || shop.shopname}</strong></div>
           </div>
         </div>
       </div>
@@ -2254,9 +2258,9 @@ function buildA4Invoice(d) {
       <div style="background:#1E1B4B;margin:-16px -16px 0;padding:10px 14px;border-radius:10px 10px 0 0">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="display:flex;align-items:center;gap:10px">
-            ${d.shop.logoData ? `<img src="${d.shop.logoData}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3)">` : ''}
+            ${shop.logoData ? `<img src="${shop.logoData}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3)">` : ''}
             <div>
-              <div style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.3px">${d.shop.shopname}</div>
+              <div style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.3px">${shop.shopname || 'Toko'}</div>
               ${shopLines}
             </div>
           </div>
@@ -2335,21 +2339,22 @@ function buildThermalInvoice(d) {
     <div class="th-row" style="font-weight:800;font-size:12px;border-top:1px solid #000;margin-top:4px;padding-top:4px"><span>SISA TAGIHAN</span><span>${fmtRp(d.sisa)}</span></div>`;
   }
 
-  const rekeningBlock = d.shop.bankNo ? `
+  const tshop = d.shop || {};
+  const rekeningBlock = tshop.bankNo ? `
     <div class="divider-char">${sep2}</div>
     <div style="font-weight:700;font-size:11px;margin-bottom:3px">INFORMASI PEMBAYARAN</div>
     <div style="font-size:10px;line-height:1.5;margin-bottom:4px">Pembayaran invoice ini bisa melalui tunai atau transfer melalui Rekening bank di bawah ini.</div>
-    <div class="th-row" style="font-weight:700"><span>Bank</span><span>${d.shop.bankName || ''}</span></div>
-    <div class="th-row" style="font-weight:700"><span>No. Rek</span><span>${d.shop.bankNo}</span></div>
-    <div class="th-row"><span>a/n</span><span>${d.shop.bankOwner || d.shop.shopname}</span></div>` : '';
+    <div class="th-row" style="font-weight:700"><span>Bank</span><span>${tshop.bankName || ''}</span></div>
+    <div class="th-row" style="font-weight:700"><span>No. Rek</span><span>${tshop.bankNo}</span></div>
+    <div class="th-row"><span>a/n</span><span>${tshop.bankOwner || tshop.shopname}</span></div>` : '';
 
   return `
     <div class="thermal-preview" id="thermal-invoice-content">
-      <div class="shop-name">${d.shop.shopname}</div>
-      ${d.shop.field    ? `<div style="text-align:center;font-size:10px;color:#444;margin-top:1px">${d.shop.field}</div>` : ''}
-      ${d.shop.phone    ? `<div style="text-align:center;font-size:10px">📞 ${d.shop.phone}</div>` : ''}
-      ${d.shop.email    ? `<div style="text-align:center;font-size:10px">✉️ ${d.shop.email}</div>` : ''}
-      ${d.shop.address  ? `<div style="text-align:center;font-size:10px">📍 ${d.shop.address}</div>` : ''}
+      <div class="shop-name">${tshop.shopname || 'Toko'}</div>
+      ${tshop.field    ? `<div style="text-align:center;font-size:10px;color:#444;margin-top:1px">${tshop.field}</div>` : ''}
+      ${tshop.phone    ? `<div style="text-align:center;font-size:10px">📞 ${tshop.phone}</div>` : ''}
+      ${tshop.email    ? `<div style="text-align:center;font-size:10px">✉️ ${tshop.email}</div>` : ''}
+      ${tshop.address  ? `<div style="text-align:center;font-size:10px">📍 ${tshop.address}</div>` : ''}
       <div class="divider-char">${sep}</div>
       <div class="th-row"><span>No:</span><span style="font-weight:700">${d.invNo}</span></div>
       <div class="th-row"><span>Tgl:</span><span>${d.date}</span></div>
@@ -2456,10 +2461,11 @@ function buildWAText(d) {
   const dpLine = d.payStatus === 'DP'
     ? `DP Dibayar  : ${fmtRp(d.dp)}\n*SISA TAGIHAN: ${fmtRp(d.sisa)}*\n`
     : '';
-  const rekeningLine = d.shop.bankNo
-    ? `────────────────────\n💳 *INFORMASI PEMBAYARAN*\nPembayaran invoice ini bisa melalui tunai atau transfer melalui Rekening bank di bawah ini.\n\nBank    : *${d.shop.bankName}*\nNo. Rek : *${d.shop.bankNo}*\na/n       : *${d.shop.bankOwner || d.shop.shopname}*\n`
+  const wshop = d.shop || {};
+  const rekeningLine = wshop.bankNo
+    ? `────────────────────\n💳 *INFORMASI PEMBAYARAN*\nPembayaran invoice ini bisa melalui tunai atau transfer melalui Rekening bank di bawah ini.\n\nBank    : *${wshop.bankName}*\nNo. Rek : *${wshop.bankNo}*\na/n       : *${wshop.bankOwner || wshop.shopname}*\n`
     : '';
-  return `*${d.shop.shopname}* — Invoice\n`
+  return `*${wshop.shopname || 'Toko'}* — Invoice\n`
     + (d.shop.field   ? `${d.shop.field}\n` : '')
     + (d.shop.phone   ? `📞 ${d.shop.phone}\n` : '')
     + `────────────────────\n`
@@ -2523,12 +2529,13 @@ function showSavePopup(message, onDone) {
     document.head.appendChild(style);
   }
   document.body.appendChild(overlay);
+  let closed = false;
   const close = () => {
-    document.body.removeChild(overlay);
+    if (closed) return; closed = true;
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     if (typeof onDone === 'function') onDone();
   };
   overlay.querySelector('#save-popup-ok').onclick = close;
-  // Auto-close after 1.5s jika user tidak tap
   setTimeout(close, 1500);
 }
 
@@ -2546,6 +2553,7 @@ function saveOrder() {
   // Visual feedback on button — prevent double tap
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyimpan...'; btn.style.background = '#94A3B8'; }
 
+  try {
   const d = getFormData();
   const baseHpp = parseFloat(document.getElementById('f-base-hpp').value) || 0;
   const avgPrice = d.totalQty > 0 ? d.totalRevenue / d.totalQty : d.base;
@@ -2603,11 +2611,17 @@ function saveOrder() {
   }
 
   saveData();
-  // Popup konfirmasi → langsung pindah ke riwayat order
   showSavePopup('✅ Order tersimpan!', () => {
     navigate('history');
     setTimeout(() => clearForm(), 100);
   });
+
+  } catch(err) {
+    // Kalau ada error apapun, reset tombol dan tampilkan pesan
+    if (btn) { btn.disabled = false; btn.innerHTML = '💾 Simpan Order'; btn.style.background = ''; }
+    toast('❌ Gagal simpan: ' + err.message, 'error');
+    console.error('saveOrder error:', err);
+  }
 }
 
 function clearForm() {
@@ -2654,49 +2668,60 @@ function populateMonthFilter() {
 }
 
 function renderHistory() {
-  populateMonthFilter();
+  try { populateMonthFilter(); } catch(e) {}
   const list = document.getElementById('history-list');
-  const search = document.getElementById('search-history').value.toLowerCase();
-  const filterStatus = document.getElementById('filter-status').value;
-  const filterMonth = document.getElementById('filter-month').value;
-  let orders = [...store.orders].reverse();
-  if (search) orders = orders.filter(o => o.customer.toLowerCase().includes(search) || o.product.toLowerCase().includes(search) || o.invNo.toLowerCase().includes(search));
-  if (filterStatus) orders = orders.filter(o => o.payStatus === filterStatus);
-  if (filterMonth) {
-    const [fy, fm] = filterMonth.split('-').map(Number);
-    orders = orders.filter(o => { const d = new Date(o.date); return d.getFullYear()===fy && d.getMonth()+1===fm; });
+  if (!list) return;
+  try {
+    const search = (document.getElementById('search-history')?.value || '').toLowerCase();
+    const filterStatus = document.getElementById('filter-status')?.value || '';
+    const filterMonth = document.getElementById('filter-month')?.value || '';
+    let orders = [...(store.orders || [])].reverse();
+    orders = orders.filter(o => o && o.id);
+    if (search) orders = orders.filter(o =>
+      (o.customer||'').toLowerCase().includes(search) ||
+      (o.product||'').toLowerCase().includes(search) ||
+      (o.invNo||'').toLowerCase().includes(search)
+    );
+    if (filterStatus) orders = orders.filter(o => o.payStatus === filterStatus);
+    if (filterMonth) {
+      const [fy, fm] = filterMonth.split('-').map(Number);
+      orders = orders.filter(o => { try { const d = new Date(o.date); return d.getFullYear()===fy && d.getMonth()+1===fm; } catch(e){ return false; } });
+    }
+    if (!orders.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada order tersimpan</p></div>';
+      return;
+    }
+    const statusBadge = s => s === 'Lunas' ? `<span class="badge badge-success">✅ ${s}</span>` : s === 'DP' ? `<span class="badge badge-accent">💳 ${s}</span>` : `<span class="badge badge-danger">⏳ ${s}</span>`;
+    list.innerHTML = orders.map(o => {
+      try {
+        return `<div class="order-card" onclick="openDetail(${o.id})">
+          <div class="order-card-top">
+            <div>
+              <div style="font-size:15px;font-weight:700">${o.customer||'-'}</div>
+              <div style="font-size:12px;color:var(--text-muted)">${o.product||'-'} <span style="opacity:.6">(${o.model||'-'})</span></div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--brand)">${fmtRp(o.totalRevenue||0)}</div>
+              <div style="font-size:10px;color:var(--text-muted)">${o.totalQty||0} pcs</div>
+            </div>
+          </div>
+          <div class="order-card-bottom">
+            <div style="display:flex;align-items:center;gap:6px">
+              ${statusBadge(o.payStatus||'Belum Bayar')}
+              <span style="font-size:11px;color:var(--text-muted)">${o.date ? new Date(o.date).toLocaleDateString('id-ID') : '-'}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${o.deadline ? deadlineLabel(o.deadline) : ''}
+              <span class="mono" style="font-size:11px;color:var(--text-muted)">${o.invNo||'-'}</span>
+            </div>
+          </div>
+        </div>`;
+      } catch(e) { return ''; }
+    }).join('');
+  } catch(e) {
+    if (list) list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Gagal memuat riwayat</p></div>';
+    console.error('renderHistory error:', e);
   }
-
-  if (!orders.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada order tersimpan</p></div>';
-    return;
-  }
-
-  const statusBadge = s => s === 'Lunas' ? `<span class="badge badge-success">✅ ${s}</span>` : s === 'DP' ? `<span class="badge badge-accent">💳 ${s}</span>` : `<span class="badge badge-danger">⏳ ${s}</span>`;
-
-  list.innerHTML = orders.map(o => `
-    <div class="order-card" onclick="openDetail(${o.id})">
-      <div class="order-card-top">
-        <div>
-          <div style="font-size:15px;font-weight:700">${o.customer}</div>
-          <div style="font-size:12px;color:var(--text-muted)">${o.product} <span style="opacity:.6">(${o.model})</span></div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--brand)">${fmtRp(o.totalRevenue)}</div>
-          <div style="font-size:10px;color:var(--text-muted)">${o.totalQty} pcs</div>
-        </div>
-      </div>
-      <div class="order-card-bottom">
-        <div style="display:flex;align-items:center;gap:6px">
-          ${statusBadge(o.payStatus)}
-          <span style="font-size:11px;color:var(--text-muted)">${new Date(o.date).toLocaleDateString('id-ID')}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${o.deadline ? deadlineLabel(o.deadline) : ''}
-          <span class="mono" style="font-size:11px;color:var(--text-muted)">${o.invNo}</span>
-        </div>
-      </div>
-    </div>`).join('');
 }
 
 function deadlineLabel(dl) {
@@ -2719,9 +2744,17 @@ function setDetailPrintType(type, el) {
 function refreshDetailBody() {
   if (!currentDetailOrder) return;
   const o = currentDetailOrder;
-  const d = { ...o, date: new Date(o.date).toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}), shop: o.shop };
+  // Pastikan shop tidak undefined — fallback ke store.settings
+  const shop = (o.shop && o.shop.shopname) ? o.shop : { ...store.settings };
+  const d = { ...o, shop, date: o.date ? new Date(o.date).toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}) : '-' };
   const body = document.getElementById('detail-modal-body');
-  body.innerHTML = currentDetailPrintType === 'a4' ? buildA4Invoice(d) : buildThermalInvoice(d);
+  if (!body) return;
+  try {
+    body.innerHTML = currentDetailPrintType === 'a4' ? buildA4Invoice(d) : buildThermalInvoice(d);
+  } catch(e) {
+    body.innerHTML = '<div style="padding:16px;color:var(--danger);font-size:13px">⚠️ Gagal render invoice: ' + e.message + '</div>';
+    console.error('refreshDetailBody error:', e);
+  }
 }
 
 function openDetail(id) {
@@ -2815,9 +2848,9 @@ function saveEditDpItem(i) {
   currentDetailOrder = o;
 
   saveData();
-  renderEditDpList();
-  refreshDetailBody();
-  renderHistory();
+  try { renderEditDpList(); } catch(e) {}
+  try { refreshDetailBody(); } catch(e) {}
+  try { renderHistory(); } catch(e) {}
   toast('✅ Pembayaran diperbarui!', 'success');
 }
 
@@ -2844,9 +2877,9 @@ function deleteEditDpItem(i) {
   currentDetailOrder = o;
 
   saveData();
-  renderEditDpList();
-  refreshDetailBody();
-  renderHistory();
+  try { renderEditDpList(); } catch(e) {}
+  try { refreshDetailBody(); } catch(e) {}
+  try { renderHistory(); } catch(e) {}
   toast('🗑️ Pembayaran dihapus', 'error');
 }
 
@@ -2870,8 +2903,8 @@ function submitAddDp() {
   saveData();
   currentDetailOrder = o;
   document.getElementById('add-dp-section').style.display = 'none';
-  refreshDetailBody();
-  renderHistory();
+  try { refreshDetailBody(); } catch(e) {}
+  try { renderHistory(); } catch(e) {}
   toast(`✅ ${note} ${fmtRp(amount)} tersimpan!`);
 }
 
@@ -2889,17 +2922,84 @@ function openEditOrder() {
   document.getElementById('edit-base-price').value = o.base;
   document.getElementById('edit-base-hpp').value = o.baseHpp || o.hpp?.hppPerPcs || '';
   document.getElementById('edit-pay-status').value = o.payStatus;
-  document.getElementById('edit-dp').value = o.dp || '';
-  document.getElementById('edit-dp-group').style.display = o.payStatus === 'DP' ? 'flex' : 'none';
   document.getElementById('edit-notes').value = o.notes || '';
+  renderEditDpInline(o);
   renderEditSizeGrid(o);
   recalcEditSizes();
   openModal('edit-order-modal');
 }
 
+function renderEditDpInline(o) {
+  const grp  = document.getElementById('edit-dp-group');
+  const list = document.getElementById('edit-dp-inline-list');
+  const inp  = document.getElementById('edit-dp');
+  const payStatus = o.payStatus || document.getElementById('edit-pay-status').value;
+
+  if (payStatus !== 'DP') { grp.style.display = 'none'; return; }
+  grp.style.display = '';
+
+  const dpHistory = o.dpHistory || [];
+  if (dpHistory.length > 0) {
+    // Tampilkan setiap cicilan sebagai input yang bisa langsung diedit
+    inp.style.display = 'none';
+    list.innerHTML = dpHistory.map((item, i) => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input type="text" value="${item.note || ('DP ke-'+(i+1))}" id="edpi-note-${i}"
+          style="flex:1.2;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg-input);color:var(--text-primary);font-family:'Inter',sans-serif;outline:none">
+        <input type="number" inputmode="numeric" value="${item.amount}" id="edpi-amount-${i}"
+          style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg-input);color:var(--text-primary);font-family:'JetBrains Mono',monospace;outline:none"
+          oninput="recalcEditDpInline()">
+        <button onclick="removeEditDpInlineItem(${i})" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:15px;cursor:pointer;flex-shrink:0">🗑️</button>
+      </div>`).join('');
+    list.innerHTML += `
+      <div id="edpi-sisa-box" style="font-size:12px;color:var(--text-secondary);padding:4px 2px"></div>
+      <button onclick="addEditDpInlineItem()" style="width:100%;padding:8px;border:1.5px dashed var(--border);border-radius:8px;background:none;color:var(--brand);font-size:13px;font-weight:600;cursor:pointer;margin-top:2px">+ Tambah Cicilan</button>`;
+    recalcEditDpInline();
+  } else {
+    // Belum ada dpHistory — tampilkan field tunggal
+    list.innerHTML = '';
+    inp.style.display = '';
+    inp.value = o.dp || '';
+  }
+}
+
+function recalcEditDpInline() {
+  const o = currentDetailOrder;
+  if (!o) return;
+  const dpHistory = o.dpHistory || [];
+  let total = 0;
+  dpHistory.forEach((_, i) => {
+    const el = document.getElementById(`edpi-amount-${i}`);
+    if (el) total += parseFloat(el.value) || 0;
+  });
+  const sisa = Math.max(0, (o.totalRevenue || 0) - total);
+  const box = document.getElementById('edpi-sisa-box');
+  if (box) box.innerHTML = `Total dibayar: <strong>${fmtRp(total)}</strong> &nbsp;|&nbsp; Sisa: <strong style="color:${sisa>0?'var(--danger)':'var(--success)'}">${fmtRp(sisa)}</strong>`;
+}
+
+function removeEditDpInlineItem(i) {
+  const o = currentDetailOrder;
+  if (!o || !o.dpHistory) return;
+  o.dpHistory.splice(i, 1);
+  renderEditDpInline(o);
+}
+
+function addEditDpInlineItem() {
+  const o = currentDetailOrder;
+  if (!o) return;
+  if (!o.dpHistory) o.dpHistory = [];
+  const tgl = new Date().toISOString().split('T')[0];
+  o.dpHistory.push({ amount: 0, note: `DP ke-${o.dpHistory.length + 1}`, date: tgl });
+  renderEditDpInline(o);
+}
+
 function toggleEditDp() {
   const v = document.getElementById('edit-pay-status').value;
-  document.getElementById('edit-dp-group').style.display = v === 'DP' ? 'flex' : 'none';
+  const o = currentDetailOrder;
+  if (!o) return;
+  // Sync payStatus sementara ke o supaya renderEditDpInline bisa baca
+  const oTemp = { ...o, payStatus: v };
+  renderEditDpInline(oTemp);
 }
 
 function renderEditSizeGrid(o) {
@@ -2968,37 +3068,90 @@ function recalcEditSizes() {
 function saveEditOrder() {
   const o = currentDetailOrder;
   if (!o) return;
-  const customer = document.getElementById('edit-customer').value;
+  const customer = document.getElementById('edit-customer').value.trim();
   if (!customer) { toast('⚠️ Nama pelanggan wajib diisi!', 'warn'); return; }
-  const base    = parseFloat(document.getElementById('edit-base-price').value) || o.base;
-  const baseHpp = parseFloat(document.getElementById('edit-base-hpp').value) || o.baseHpp || 0;
-  const sizes   = getEditSizeData();
-  const totalQty     = sizes.reduce((a,s)=>a+s.qty,0);
-  const totalRevenue = sizes.reduce((a,s)=>a+s.qty*(base+s.add),0);
-  const payStatus = document.getElementById('edit-pay-status').value;
-  const dp   = payStatus === 'DP' ? (parseFloat(document.getElementById('edit-dp').value)||o.dp||0) : (payStatus==='Lunas'?totalRevenue:0);
-  const sisa = payStatus==='Lunas' ? 0 : payStatus==='DP' ? totalRevenue-dp : totalRevenue;
 
-  // Update HPP cashflow entries — hapus yang lama, buat yang baru
-  store.cashflow = store.cashflow.filter(c => !(c.type==='out' && c.desc.includes(o.invNo) && c.desc.startsWith('HPP')));
-  if (baseHpp > 0 && totalQty > 0) {
-    const tgl = o.date || new Date().toISOString().split('T')[0];
-    const breakdown = { bahan: Math.round(baseHpp*0.55), sablon: Math.round(baseHpp*0.45) };
-    if (breakdown.bahan > 0)  store.cashflow.push({ id: Date.now()+2, type:'out', desc:`HPP Bahan — ${o.invNo} (${customer})`,         amount: breakdown.bahan  * totalQty, date: tgl, category:'Biaya Produksi' });
-    if (breakdown.sablon > 0) store.cashflow.push({ id: Date.now()+3, type:'out', desc:`HPP Sablon/Bordir — ${o.invNo} (${customer})`, amount: breakdown.sablon * totalQty, date: tgl, category:'Biaya Produksi' });
+  const base       = parseFloat(document.getElementById('edit-base-price').value) || o.base;
+  const baseHpp    = parseFloat(document.getElementById('edit-base-hpp').value) || o.baseHpp || 0;
+  const editSizes  = getEditSizeData();
+  const sizes      = editSizes.length > 0 ? editSizes : o.sizes;
+  const totalQty     = sizes.reduce((a,s)=>a+s.qty, 0);
+  const totalRevenue = sizes.reduce((a,s)=>a+s.qty*(base+s.add), 0);
+  const payStatus    = document.getElementById('edit-pay-status').value;
+  const tglOrder     = o.date ? o.date.split('T')[0] : new Date().toISOString().split('T')[0];
+
+  // ── Baca dpHistory dari inline inputs (jika ada) ──
+  let newDpHistory = [];
+  if (payStatus === 'DP' && o.dpHistory && o.dpHistory.length > 0) {
+    // Baca dari input inline yang dirender
+    o.dpHistory.forEach((item, i) => {
+      const noteEl   = document.getElementById(`edpi-note-${i}`);
+      const amountEl = document.getElementById(`edpi-amount-${i}`);
+      if (amountEl) {
+        newDpHistory.push({
+          note:   noteEl ? noteEl.value : (item.note || `DP ke-${i+1}`),
+          amount: parseFloat(amountEl.value) || 0,
+          date:   item.date || tglOrder,
+        });
+      }
+    });
+    // Hanya simpan yang amount > 0
+    newDpHistory = newDpHistory.filter(x => x.amount > 0);
+  } else if (payStatus === 'DP') {
+    // Belum ada dpHistory — pakai field tunggal edit-dp
+    const dpVal = parseFloat(document.getElementById('edit-dp').value) || 0;
+    if (dpVal > 0) {
+      newDpHistory = [{ amount: dpVal, note: 'DP ke-1', date: tglOrder }];
+    }
   }
 
-  // Update pemasukan cashflow jika revenue berubah (update amount di entry yang ada)
-  store.cashflow.forEach(c => {
-    if (c.type==='in' && c.desc.includes(o.invNo)) {
-      if (payStatus==='Lunas') c.amount = totalRevenue;
-    }
-  });
+  // ── Hitung dp & sisa ──
+  let dp, sisa;
+  if (payStatus === 'Lunas') {
+    dp = totalRevenue; sisa = 0;
+    newDpHistory = o.dpHistory ? [...o.dpHistory] : []; // tetap simpan riwayat cicilan lama
+  } else if (payStatus === 'DP') {
+    dp   = newDpHistory.reduce((a,x)=>a+x.amount, 0);
+    sisa = Math.max(0, totalRevenue - dp);
+  } else {
+    dp = 0; sisa = totalRevenue; newDpHistory = [];
+  }
 
+  // ── Rebuild semua cashflow terkait invNo ini dari nol ──
+  store.cashflow = store.cashflow.filter(c => !c.desc.includes(o.invNo));
+
+  // Pemasukan dari dpHistory / status
+  if (payStatus === 'Lunas') {
+    if (newDpHistory.length > 0) {
+      newDpHistory.forEach((item, i) => {
+        store.cashflow.push({ id: Date.now()+i, type:'in', desc:`${item.note||('DP ke-'+(i+1))} — ${o.invNo} (${customer})`, amount:item.amount, date:item.date||tglOrder, category:'Penjualan' });
+      });
+      const totalPaid = newDpHistory.reduce((a,x)=>a+x.amount, 0);
+      if (totalPaid < totalRevenue) {
+        store.cashflow.push({ id: Date.now()+100, type:'in', desc:`Pelunasan — ${o.invNo} (${customer})`, amount:totalRevenue-totalPaid, date:tglOrder, category:'Penjualan' });
+      }
+    } else {
+      store.cashflow.push({ id: Date.now()+1, type:'in', desc:`Lunas — ${o.invNo} (${customer})`, amount:totalRevenue, date:tglOrder, category:'Penjualan' });
+    }
+  } else if (payStatus === 'DP') {
+    newDpHistory.forEach((item, i) => {
+      store.cashflow.push({ id: Date.now()+i, type:'in', desc:`${item.note||('DP ke-'+(i+1))} — ${o.invNo} (${customer})`, amount:item.amount, date:item.date||tglOrder, category:'Penjualan' });
+    });
+  }
+  // Belum Bayar → tidak ada pemasukan
+
+  // HPP pengeluaran
+  if (baseHpp > 0 && totalQty > 0) {
+    const bd = { bahan: Math.round(baseHpp*0.55), sablon: Math.round(baseHpp*0.45) };
+    if (bd.bahan > 0)  store.cashflow.push({ id: Date.now()+200, type:'out', desc:`HPP Bahan — ${o.invNo} (${customer})`,         amount:bd.bahan  *totalQty, date:tglOrder, category:'Biaya Produksi' });
+    if (bd.sablon > 0) store.cashflow.push({ id: Date.now()+201, type:'out', desc:`HPP Sablon/Bordir — ${o.invNo} (${customer})`, amount:bd.sablon *totalQty, date:tglOrder, category:'Biaya Produksi' });
+  }
+
+  // ── Update order ──
   const idx = store.orders.findIndex(x=>x.id===o.id);
   if (idx < 0) return;
-  const newHppPerPcs = baseHpp > 0 ? baseHpp : (totalQty > 0 ? totalRevenue / totalQty * 0.5 : 0);
-  const newTotalHpp  = baseHpp > 0 ? baseHpp * totalQty : 0;
+  const newHppPerPcs = baseHpp > 0 ? baseHpp : (totalQty > 0 ? totalRevenue/totalQty*0.5 : 0);
+  const newTotalHpp  = sizes.reduce((a,s)=>{ const h=baseHpp>0?(baseHpp+s.add):newHppPerPcs; return a+h*s.qty; }, 0);
   store.orders[idx] = {
     ...o,
     customer,
@@ -3006,16 +3159,10 @@ function saveEditOrder() {
     deadline: document.getElementById('edit-deadline').value,
     address:  document.getElementById('edit-address').value,
     product:  document.getElementById('edit-product').value,
-    base,
-    baseHpp,
-    sizes:        sizes.length > 0 ? sizes : o.sizes,
-    totalQty:     sizes.length > 0 ? totalQty : o.totalQty,
-    totalRevenue: sizes.length > 0 ? totalRevenue : o.totalRevenue,
-    payStatus,
-    dp,
-    sisa,
+    base, baseHpp, sizes, totalQty, totalRevenue,
+    payStatus, dp, sisa,
+    dpHistory: newDpHistory,
     notes: document.getElementById('edit-notes').value,
-    baseHpp,
     hpp: { hppPerPcs: newHppPerPcs, totalHpp: newTotalHpp, breakdown: { bahan: Math.round(baseHpp*0.55), sablon: Math.round(baseHpp*0.45), afdruk: 0 } },
   };
   currentDetailOrder = store.orders[idx];
@@ -3024,7 +3171,6 @@ function saveEditOrder() {
   renderHistory();
   renderDashboard();
 
-  // Popup konfirmasi + balik ke halaman invoice (detail modal)
   showSavePopup('✅ Perubahan disimpan!', () => {
     refreshDetailBody();
     openModal('detail-modal');
@@ -3058,8 +3204,8 @@ function deleteOrder(id) {
     saveData();
     toast('🗑️ Order berhasil dihapus!', 'error');
     closeModal('detail-modal');
-    renderHistory();
-    renderDashboard();
+    try { renderHistory(); } catch(e) {}
+    try { renderDashboard(); } catch(e) {}
   };
 }
 
@@ -3105,6 +3251,7 @@ function setBelanjaTab(tab, el) {
 // CASHFLOW
 // ===================================================
 function renderCashflow() {
+  try {
   // Populate month filter
   const sel = document.getElementById('cf-filter-month');
   if (sel) {
@@ -3280,6 +3427,7 @@ function renderCashflow() {
         ${item.action}
       </div>
     </div>`).join('');
+  } catch(e) { console.error('renderCashflow error:', e); }
 }
 
 function openAddCashflow() {
@@ -3723,25 +3871,29 @@ function setDashTab(tab, el) {
 }
 
 function renderDashboard() {
+  try {
   const now = new Date();
   const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const start = dashTab === 'week' ? startOfWeek : startOfMonth;
 
-  const orders = store.orders.filter(o => new Date(o.date) >= start);
-  const revenue = orders.reduce((a, o) => a + o.totalRevenue, 0);
-  const totalQty = orders.reduce((a, o) => a + o.totalQty, 0);
+  const allOrders = (store.orders || []).filter(o => o && o.id);
+  const orders = allOrders.filter(o => { try { return new Date(o.date) >= start; } catch(e){ return false; } });
+  const revenue = orders.reduce((a, o) => a + (o.totalRevenue||0), 0);
+  const totalQty = orders.reduce((a, o) => a + (o.totalQty||0), 0);
   const lunas = orders.filter(o => o.payStatus === 'Lunas').length;
 
   const prevStart = dashTab === 'week'
     ? new Date(startOfWeek.getTime() - 7*86400000)
     : new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevEnd = dashTab === 'week' ? startOfWeek : startOfMonth;
-  const prevOrders = store.orders.filter(o => new Date(o.date) >= prevStart && new Date(o.date) < prevEnd);
-  const prevRevenue = prevOrders.reduce((a, o) => a + o.totalRevenue, 0);
+  const prevOrders = allOrders.filter(o => { try { return new Date(o.date) >= prevStart && new Date(o.date) < prevEnd; } catch(e){ return false; } });
+  const prevRevenue = prevOrders.reduce((a, o) => a + (o.totalRevenue||0), 0);
   const change = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue * 100).toFixed(1) : null;
 
-  document.getElementById('stats-grid').innerHTML = `
+  const statsGrid = document.getElementById('stats-grid');
+  if (!statsGrid) return;
+  statsGrid.innerHTML = `
     <div class="stat-card">
       <div class="stat-icon" style="background:#EEF2FF">💰</div>
       <div class="stat-value" style="font-size:16px">${fmtRp(revenue)}</div>
@@ -3768,31 +3920,32 @@ function renderDashboard() {
   renderChart();
   renderRecentOrders(orders);
   renderDeadlines();
+  } catch(e) { console.error('renderDashboard error:', e); }
 }
 
 function renderChart() {
+  try {
   const chartArea = document.getElementById('chart-area');
+  if (!chartArea) return;
   const now = new Date();
+  const safeOrders = (store.orders || []).filter(o => o && o.id);
   if (dashTab === 'week') {
     const days = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
     const data = Array(7).fill(0);
     const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
-    store.orders.forEach(o => {
-      const d = new Date(o.date);
-      if (d >= startOfWeek) { data[d.getDay()] += o.totalRevenue; }
+    safeOrders.forEach(o => {
+      try { const d = new Date(o.date); if (d >= startOfWeek) { data[d.getDay()] += (o.totalRevenue||0); } } catch(e){}
     });
     renderBarChart(chartArea, days, data);
   } else {
     const weeks = ['M1','M2','M3','M4','M5'];
     const data = Array(5).fill(0);
-    store.orders.forEach(o => {
-      const d = new Date(o.date);
-      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-        data[Math.min(Math.floor((d.getDate()-1)/7), 4)] += o.totalRevenue;
-      }
+    safeOrders.forEach(o => {
+      try { const d = new Date(o.date); if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) { data[Math.min(Math.floor((d.getDate()-1)/7), 4)] += (o.totalRevenue||0); } } catch(e){}
     });
     renderBarChart(chartArea, weeks, data);
   }
+  } catch(e) { console.error('renderChart error:', e); }
 }
 
 function renderBarChart(container, labels, data) {
@@ -3815,39 +3968,49 @@ function fmtK(v) {
 }
 
 function renderRecentOrders(orders) {
-  const recent = [...orders].reverse().slice(0, 4);
+  try {
+  const recent = [...(orders||[])].reverse().slice(0, 4);
   const el = document.getElementById('recent-orders');
+  if (!el) return;
   if (!recent.length) { el.innerHTML = '<div class="empty-state" style="padding:20px"><p>Belum ada order</p></div>'; return; }
-  el.innerHTML = recent.map(o => `
+  el.innerHTML = recent.map(o => {
+    try { return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openDetail(${o.id})">
       <div style="min-width:0">
-        <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.customer}</div>
-        <div style="font-size:11px;color:var(--text-muted)">${o.product} • ${o.totalQty}pcs</div>
+        <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.customer||'-'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${o.product||'-'} • ${o.totalQty||0}pcs</div>
       </div>
       <div style="text-align:right;flex-shrink:0;margin-left:8px">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--brand)">${fmtRp(o.totalRevenue)}</div>
-        <div style="font-size:10px;color:var(--text-muted)">${o.invNo}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--brand)">${fmtRp(o.totalRevenue||0)}</div>
+        <div style="font-size:10px;color:var(--text-muted)">${o.invNo||'-'}</div>
       </div>
-    </div>`).join('');
+    </div>`; } catch(e){ return ''; }
+  }).join('');
+  } catch(e) { console.error('renderRecentOrders error:', e); }
 }
 
 function renderDeadlines() {
+  try {
   const el = document.getElementById('deadline-list');
-  const coming = store.orders
-    .filter(o => o.deadline)
-    .map(o => ({ ...o, diff: Math.ceil((new Date(o.deadline) - new Date()) / 86400000) }))
-    .filter(o => o.diff >= -1)
+  if (!el) return;
+  const coming = (store.orders || [])
+    .filter(o => o && o.deadline)
+    .map(o => { try { return { ...o, diff: Math.ceil((new Date(o.deadline) - new Date()) / 86400000) }; } catch(e){ return null; } })
+    .filter(o => o && o.diff >= -1)
     .sort((a, b) => a.diff - b.diff)
     .slice(0, 5);
   if (!coming.length) { el.innerHTML = '<div class="empty-state" style="padding:16px"><p>Tidak ada deadline mendekati</p></div>'; return; }
-  el.innerHTML = coming.map(o => `
+  el.innerHTML = coming.map(o => {
+    try { return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
       <div>
-        <div style="font-size:13px;font-weight:700">${o.customer}</div>
-        <div style="font-size:11px;color:var(--text-muted)">${o.product} • ${o.invNo}</div>
+        <div style="font-size:13px;font-weight:700">${o.customer||'-'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${o.product||'-'} • ${o.invNo||'-'}</div>
       </div>
       <div style="text-align:right">${deadlineLabel(o.deadline)}</div>
-    </div>`).join('');
+    </div>`; } catch(e){ return ''; }
+  }).join('');
+  } catch(e) { console.error('renderDeadlines error:', e); }
 }
 
 // ===================================================
@@ -3894,15 +4057,26 @@ if ('serviceWorker' in navigator) {
 // ===================================================
 // INIT
 // ===================================================
-loadData();
-loadTheme();
-syncThemePicker();
-renderSizeGrid();
-renderCuttingBtns();
-updateProdukSummary();
-renderDashboard();
-recalculate();
-updateTopbarLogo();
+// Global error handler - tangkap semua uncaught error biar app tidak crash
+window.addEventListener('error', function(e) {
+  // Abaikan cross-origin errors (sw.js, fonts, dll)
+  if (!e.message || e.message === 'Script error.' || e.message === 'Script error') return;
+  console.error('Global error caught:', e.message, e.filename, e.lineno);
+});
+window.addEventListener('unhandledrejection', function(e) {
+  e.preventDefault();
+  console.error('Unhandled promise rejection:', e.reason);
+});
+
+try { loadData(); } catch(e) { console.error('loadData error:', e); }
+try { loadTheme(); } catch(e) {}
+try { syncThemePicker(); } catch(e) {}
+try { renderSizeGrid(); } catch(e) { console.error('renderSizeGrid error:', e); }
+try { renderCuttingBtns(); } catch(e) {}
+try { updateProdukSummary(); } catch(e) {}
+try { renderDashboard(); } catch(e) { console.error('renderDashboard init error:', e); }
+try { recalculate(); } catch(e) {}
+try { updateTopbarLogo(); } catch(e) {}
 </script>
 </body>
 </html>
