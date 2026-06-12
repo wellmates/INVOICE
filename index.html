@@ -2228,11 +2228,14 @@ function buildA4Invoice(d) {
       <div style="background:#1E1B4B;padding:6px 10px">
         <div style="color:#fff;font-size:10px;font-weight:700;letter-spacing:.5px">💳 INFORMASI PEMBAYARAN</div>
       </div>
-      <div style="padding:8px 10px;background:#F8FAFC;display:flex;align-items:center;gap:10px">
-        <div style="background:#1E1B4B;color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;flex-shrink:0">${d.shop.bankName || 'BANK'}</div>
-        <div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#0F172A;letter-spacing:1px">${d.shop.bankNo}</div>
-          <div style="font-size:9px;color:#64748B;margin-top:1px">a/n <strong>${d.shop.bankOwner || d.shop.shopname}</strong></div>
+      <div style="padding:8px 10px;background:#F8FAFC">
+        <div style="font-size:9px;color:#64748B;margin-bottom:8px;line-height:1.5">Pembayaran transaksi ini bisa dilakukan melalui tunai atau transfer melalui rekening bank di bawah ini.</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="background:#1E1B4B;color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;flex-shrink:0">${d.shop.bankName || 'BANK'}</div>
+          <div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#0F172A;letter-spacing:1px">${d.shop.bankNo}</div>
+            <div style="font-size:9px;color:#64748B;margin-top:1px">a/n <strong>${d.shop.bankOwner || d.shop.shopname}</strong></div>
+          </div>
         </div>
       </div>
     </div>` : '';
@@ -2499,6 +2502,10 @@ function copyToWA() {
 // SAVE POPUP (konfirmasi visual sebelum pindah halaman)
 // ===================================================
 function showSavePopup(message, onDone) {
+  // Reset tombol simpan order jika ada (jaga-jaga stuck)
+  const saveBtn = document.getElementById('btn-save-order');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '💾 Simpan Order'; saveBtn.style.background = ''; }
+
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn .15s ease';
   overlay.innerHTML = `
@@ -2521,8 +2528,8 @@ function showSavePopup(message, onDone) {
     if (typeof onDone === 'function') onDone();
   };
   overlay.querySelector('#save-popup-ok').onclick = close;
-  // Auto-close after 2.5s jika user tidak tap
-  setTimeout(close, 2500);
+  // Auto-close after 1.5s jika user tidak tap
+  setTimeout(close, 1500);
 }
 
 // ===================================================
