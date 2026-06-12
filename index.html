@@ -999,7 +999,7 @@ body {
         </div>
       </div>
 
-      <button class="btn btn-primary btn-block" onclick="saveOrder()">
+      <button class="btn btn-primary btn-block" id="btn-save-order" onclick="saveOrder()" style="font-size:16px;padding:16px;letter-spacing:.3px">
         💾 Simpan Order
       </button>
       <div style="height:8px"></div>
@@ -1723,8 +1723,12 @@ function navigate(page) {
   if (page === 'dashboard') renderDashboard();
   if (page === 'history') renderHistory();
   if (page === 'cashflow') renderCashflow();
-  // Scroll top
-  document.querySelector('.content').scrollTo(0, 0);
+  // Scroll to top — cover all cases including iOS Safari
+  try { document.querySelector('.content').scrollTop = 0; } catch(e) {}
+  try { document.querySelector('.content').scrollTo(0, 0); } catch(e) {}
+  try { window.scrollTo(0, 0); } catch(e) {}
+  try { document.body.scrollTop = 0; } catch(e) {}
+  try { document.documentElement.scrollTop = 0; } catch(e) {}
 }
 
 // ===================================================
@@ -2495,9 +2499,13 @@ function copyToWA() {
 // SAVE ORDER
 // ===================================================
 function saveOrder() {
+  const btn = document.getElementById('btn-save-order');
   const customer = document.getElementById('f-customer').value;
   const product = document.getElementById('f-product').value;
   if (!customer || !product) { toast('⚠️ Nama pelanggan dan produk wajib diisi!', 'warn'); return; }
+
+  // Visual feedback on button — prevent double tap
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyimpan...'; btn.style.background = '#94A3B8'; }
 
   const d = getFormData();
   const baseHpp = parseFloat(document.getElementById('f-base-hpp').value) || 0;
@@ -2556,12 +2564,17 @@ function saveOrder() {
   }
 
   saveData();
+  // Tampilkan toast dulu, baru pindah halaman biar user jelas lihat notifikasinya
   toast('✅ Order tersimpan!', 'success');
-  navigate('history');
-  setTimeout(() => clearForm(), 100);
+  setTimeout(() => {
+    navigate('history');
+    setTimeout(() => clearForm(), 100);
+  }, 800);
 }
 
 function clearForm() {
+  const btn = document.getElementById('btn-save-order');
+  if (btn) { btn.disabled = false; btn.innerHTML = '💾 Simpan Order'; btn.style.background = ''; }
   ['f-customer','f-phone','f-address','f-product','f-base-price','f-base-hpp','f-notes','f-dp','f-deadline']
     .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   document.getElementById('f-payment-status').value = 'Belum Bayar';
