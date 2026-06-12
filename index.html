@@ -656,17 +656,21 @@ body {
 
 /* ===================== TOAST ===================== */
 .toast {
-  position: fixed; bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 20px); left: 50%;
-  transform: translateX(-50%) translateY(80px); opacity: 0;
-  z-index: 9999; background: #1E1B4B; color: #fff;
-  padding: 11px 20px; border-radius: 99px;
-  font-size: 13px; font-weight: 500; box-shadow: var(--shadow-lg);
-  transition: all .25s; white-space: nowrap; pointer-events: none;
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.85); opacity: 0;
+  z-index: 99999; background: #1E1B4B; color: #fff;
+  padding: 16px 24px; border-radius: 16px;
+  font-size: 15px; font-weight: 700; box-shadow: 0 8px 32px rgba(0,0,0,.35);
+  transition: all .2s cubic-bezier(.34,1.56,.64,1); white-space: pre-line;
+  pointer-events: none; text-align: center; min-width: 200px; max-width: 80vw;
+  line-height: 1.5;
 }
-.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+.toast.toast-success { background: linear-gradient(135deg, #059669, #10B981); }
+.toast.toast-error   { background: linear-gradient(135deg, #DC2626, #EF4444); }
+.toast.toast-warn    { background: linear-gradient(135deg, #D97706, #F59E0B); color:#fff; }
 [data-theme="flame"] .toast,
 [data-theme="flame-dark"] .toast {
-  bottom: 100px;
   background: linear-gradient(135deg, #C0320A, #E8400C);
 }
 
@@ -1834,7 +1838,7 @@ function saveSettings() {
     logoData,
   };
   saveData();
-  toast('✅ Pengaturan tersimpan!');
+  toast('✅ Pengaturan tersimpan!', 'success');
   closeModal('settings-modal');
   updateTopbarLogo();
   recalculate();
@@ -2474,7 +2478,7 @@ function buildWAText(d) {
 function copyToWA() {
   const d = getFormData();
   navigator.clipboard.writeText(buildWAText(d)).then(() => {
-    toast('✅ Teks invoice disalin! Paste ke WhatsApp.');
+    toast('✅ Teks invoice disalin! Paste ke WhatsApp.', 'success');
   }).catch(() => {
     // fallback
     const ta = document.createElement('textarea');
@@ -2483,7 +2487,7 @@ function copyToWA() {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    toast('✅ Teks invoice disalin!');
+    toast('✅ Teks invoice disalin!', 'success');
   });
 }
 
@@ -2493,7 +2497,7 @@ function copyToWA() {
 function saveOrder() {
   const customer = document.getElementById('f-customer').value;
   const product = document.getElementById('f-product').value;
-  if (!customer || !product) { toast('⚠️ Nama pelanggan dan produk wajib diisi!'); return; }
+  if (!customer || !product) { toast('⚠️ Nama pelanggan dan produk wajib diisi!', 'warn'); return; }
 
   const d = getFormData();
   const baseHpp = parseFloat(document.getElementById('f-base-hpp').value) || 0;
@@ -2552,9 +2556,9 @@ function saveOrder() {
   }
 
   saveData();
-  clearForm();
-  toast('✅ Order tersimpan!');
+  toast('✅ Order tersimpan!', 'success');
   navigate('history');
+  setTimeout(() => clearForm(), 100);
 }
 
 function clearForm() {
@@ -2763,7 +2767,7 @@ function saveEditDpItem(i) {
   renderEditDpList();
   refreshDetailBody();
   renderHistory();
-  toast('✅ Pembayaran diperbarui!');
+  toast('✅ Pembayaran diperbarui!', 'success');
 }
 
 function deleteEditDpItem(i) {
@@ -2792,13 +2796,13 @@ function deleteEditDpItem(i) {
   renderEditDpList();
   refreshDetailBody();
   renderHistory();
-  toast('🗑️ Pembayaran dihapus');
+  toast('🗑️ Pembayaran dihapus', 'error');
 }
 
 function submitAddDp() {
   const amount = parseFloat(document.getElementById('add-dp-amount').value);
   const note = document.getElementById('add-dp-note').value || 'DP';
-  if (!amount || amount <= 0) { toast('⚠️ Isi jumlah pembayaran!'); return; }
+  if (!amount || amount <= 0) { toast('⚠️ Isi jumlah pembayaran!', 'warn'); return; }
   const o = currentDetailOrder;
   if (!o) return;
   if (!o.dpHistory) o.dpHistory = [];
@@ -2914,7 +2918,7 @@ function saveEditOrder() {
   const o = currentDetailOrder;
   if (!o) return;
   const customer = document.getElementById('edit-customer').value;
-  if (!customer) { toast('⚠️ Nama pelanggan wajib diisi!'); return; }
+  if (!customer) { toast('⚠️ Nama pelanggan wajib diisi!', 'warn'); return; }
   const base    = parseFloat(document.getElementById('edit-base-price').value) || o.base;
   const baseHpp = parseFloat(document.getElementById('edit-base-hpp').value) || o.baseHpp || 0;
   const sizes   = getEditSizeData();
@@ -2965,7 +2969,7 @@ function saveEditOrder() {
   };
   currentDetailOrder = store.orders[idx];
   saveData();
-  toast('✅ Order berhasil diperbarui!');
+  toast('✅ Order berhasil diperbarui!', 'success');
   closeModal('edit-order-modal');
   refreshDetailBody();
   renderHistory();
@@ -2996,7 +3000,7 @@ function deleteOrder(id) {
     store.orders = store.orders.filter(x => x.id !== id);
     currentDetailOrder = null;
     saveData();
-    toast('🗑️ Order berhasil dihapus!');
+    toast('🗑️ Order berhasil dihapus!', 'error');
     closeModal('detail-modal');
     renderHistory();
     renderDashboard();
@@ -3007,10 +3011,10 @@ function copyDetailWA() {
   if (!currentDetailOrder) return;
   const o = currentDetailOrder;
   const d = { ...o, date: new Date(o.date).toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}), shop: o.shop };
-  navigator.clipboard.writeText(buildWAText(d)).then(() => toast('✅ Teks invoice disalin!')).catch(() => {
+  navigator.clipboard.writeText(buildWAText(d)).then(() => toast('✅ Teks invoice disalin!', 'success')).catch(() => {
     const ta = document.createElement('textarea'); ta.value = buildWAText(d);
     document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-    toast('✅ Teks invoice disalin!');
+    toast('✅ Teks invoice disalin!', 'success');
   });
 }
 
@@ -3230,7 +3234,7 @@ function openAddCashflow() {
 function saveCashflow() {
   const amount = parseFloat(document.getElementById('cf-amount').value);
   const desc = document.getElementById('cf-desc').value;
-  if (!amount || !desc) { toast('⚠️ Isi semua field!'); return; }
+  if (!amount || !desc) { toast('⚠️ Isi semua field!', 'warn'); return; }
   store.cashflow.push({
     id: Date.now(),
     type: document.getElementById('cf-type').value,
@@ -3240,7 +3244,7 @@ function saveCashflow() {
     category: document.getElementById('cf-category').value,
   });
   saveData();
-  toast('✅ Transaksi tersimpan!');
+  toast('✅ Transaksi tersimpan!', 'success');
   closeModal('cashflow-modal');
   renderCashflow();
 }
@@ -3264,7 +3268,7 @@ function deleteCashflow(id) {
     document.body.removeChild(overlay);
     store.cashflow = store.cashflow.filter(c => c.id !== id);
     saveData();
-    toast('🗑️ Transaksi dihapus!');
+    toast('🗑️ Transaksi dihapus!', 'error');
     renderCashflow();
   };
 }
@@ -3285,7 +3289,7 @@ function saveEditCashflow() {
   const id = parseInt(document.getElementById('ecf-id').value);
   const amount = parseFloat(document.getElementById('ecf-amount').value);
   const desc = document.getElementById('ecf-desc').value;
-  if (!amount || !desc) { toast('⚠️ Isi semua field!'); return; }
+  if (!amount || !desc) { toast('⚠️ Isi semua field!', 'warn'); return; }
   const idx = store.cashflow.findIndex(x => x.id === id);
   if (idx < 0) return;
   store.cashflow[idx] = {
@@ -3297,7 +3301,7 @@ function saveEditCashflow() {
     category: document.getElementById('ecf-category').value,
   };
   saveData();
-  toast('✅ Transaksi berhasil diperbarui!');
+  toast('✅ Transaksi berhasil diperbarui!', 'success');
   closeModal('edit-cashflow-modal');
   renderCashflow();
 }
@@ -3322,7 +3326,7 @@ function saveHutangPiutang() {
   const pihak = document.getElementById('hp-pihak').value;
   const amount = parseFloat(document.getElementById('hp-amount').value);
   const desc = document.getElementById('hp-desc').value;
-  if (!amount || !pihak) { toast('⚠️ Isi nama dan jumlah!'); return; }
+  if (!amount || !pihak) { toast('⚠️ Isi nama dan jumlah!', 'warn'); return; }
   const item = {
     id: Date.now(),
     pihak,
@@ -3382,7 +3386,7 @@ function saveEditHP() {
   const pihak = document.getElementById('ehp-pihak').value;
   const amount = parseFloat(document.getElementById('ehp-amount').value);
   const desc = document.getElementById('ehp-desc').value;
-  if (!amount || !pihak) { toast('⚠️ Isi nama dan jumlah!'); return; }
+  if (!amount || !pihak) { toast('⚠️ Isi nama dan jumlah!', 'warn'); return; }
   const arr = type === 'hutang' ? store.hutang : store.piutang;
   const idx = arr.findIndex(x => x.id === id);
   if (idx < 0) return;
@@ -3416,12 +3420,12 @@ function openEditInvoiceHpp(orderId) {
 function saveEditInvoiceHpp() {
   const orderId = parseInt(document.getElementById('einv-id').value);
   const newHpp = parseFloat(document.getElementById('einv-hpp').value);
-  if (!newHpp || newHpp < 0) { toast('⚠️ Masukkan nilai HPP yang valid!'); return; }
+  if (!newHpp || newHpp < 0) { toast('⚠️ Masukkan nilai HPP yang valid!', 'warn'); return; }
   const idx = store.orders.findIndex(o => o.id === orderId);
   if (idx < 0) return;
   store.orders[idx].hpp = { ...store.orders[idx].hpp, totalHpp: newHpp };
   saveData();
-  toast('✅ HPP Invoice berhasil diperbarui!');
+  toast('✅ HPP Invoice berhasil diperbarui!', 'success');
   closeModal('edit-invoice-hpp-modal');
   renderCashflow();
 }
@@ -3446,7 +3450,7 @@ function deleteInvoiceHpp(orderId) {
     const idx = store.orders.findIndex(o => o.id === orderId);
     if (idx >= 0) { store.orders[idx].hpp = { ...store.orders[idx].hpp, totalHpp: 0 }; }
     saveData();
-    toast('🗑️ HPP Invoice dihapus!');
+    toast('🗑️ HPP Invoice dihapus!', 'error');
     renderCashflow();
   };
 }
@@ -3509,7 +3513,7 @@ function openAddBelanja() {
 function saveBelanja() {
   const amount = parseFloat(document.getElementById('bel-amount').value);
   const desc = document.getElementById('bel-desc').value;
-  if (!amount || !desc) { toast('⚠️ Isi keterangan dan jumlah!'); return; }
+  if (!amount || !desc) { toast('⚠️ Isi keterangan dan jumlah!', 'warn'); return; }
   store.belanja.push({
     id: Date.now(),
     jenis: document.getElementById('bel-jenis').value,
@@ -3518,7 +3522,7 @@ function saveBelanja() {
     date: document.getElementById('bel-date').value,
   });
   saveData();
-  toast('✅ Belanja tersimpan!');
+  toast('✅ Belanja tersimpan!', 'success');
   closeModal('belanja-modal');
   renderBelanja();
 }
@@ -3526,7 +3530,7 @@ function saveBelanja() {
 function deleteBelanja(id) {
   store.belanja = store.belanja.filter(x => x.id !== id);
   saveData();
-  toast('🗑️ Belanja dihapus!');
+  toast('🗑️ Belanja dihapus!', 'error');
   renderBelanja();
 }
 
@@ -3545,7 +3549,7 @@ function saveEditBelanja() {
   const id = parseInt(document.getElementById('ebel-id').value);
   const amount = parseFloat(document.getElementById('ebel-amount').value);
   const desc = document.getElementById('ebel-desc').value;
-  if (!amount || !desc) { toast('⚠️ Isi keterangan dan jumlah!'); return; }
+  if (!amount || !desc) { toast('⚠️ Isi keterangan dan jumlah!', 'warn'); return; }
   const idx = store.belanja.findIndex(x => x.id === id);
   if (idx < 0) return;
   store.belanja[idx] = {
@@ -3556,7 +3560,7 @@ function saveEditBelanja() {
     date: document.getElementById('ebel-date').value,
   };
   saveData();
-  toast('✅ Belanja berhasil diperbarui!');
+  toast('✅ Belanja berhasil diperbarui!', 'success');
   closeModal('edit-belanja-modal');
   renderBelanja();
 }
@@ -3798,11 +3802,17 @@ function fmtRp(n) { return 'Rp' + new Intl.NumberFormat('id-ID').format(Math.rou
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-function toast(msg) {
-  const t = document.getElementById('toast');
+function toast(msg, type, duration) {
+  type = type || "default"; duration = duration || 2500;
+  const t = document.getElementById("toast");
   t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  t.className = "toast";
+  if (type === "success") t.classList.add("toast-success");
+  else if (type === "error") t.classList.add("toast-error");
+  else if (type === "warn") t.classList.add("toast-warn");
+  t.classList.add("show");
+  if (t._hideTimer) clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(function(){ t.classList.remove("show"); }, duration);
 }
 
 // Close modal on overlay click
