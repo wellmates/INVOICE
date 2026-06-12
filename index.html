@@ -2496,6 +2496,36 @@ function copyToWA() {
 }
 
 // ===================================================
+// SAVE POPUP (konfirmasi visual sebelum pindah halaman)
+// ===================================================
+function showSavePopup(message, onDone) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn .15s ease';
+  overlay.innerHTML = `
+    <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:28px 24px;max-width:300px;width:100%;box-shadow:var(--shadow-lg);text-align:center;animation:popIn .2s cubic-bezier(.34,1.56,.64,1)">
+      <div style="font-size:44px;margin-bottom:10px">✅</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px">${message}</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Data berhasil disimpan</div>
+      <button id="save-popup-ok" class="btn btn-primary btn-block" style="font-size:15px">OK</button>
+    </div>`;
+  // Inject animation keyframes once
+  if (!document.getElementById('popup-anim-style')) {
+    const style = document.createElement('style');
+    style.id = 'popup-anim-style';
+    style.textContent = `@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}`;
+    document.head.appendChild(style);
+  }
+  document.body.appendChild(overlay);
+  const close = () => {
+    document.body.removeChild(overlay);
+    if (typeof onDone === 'function') onDone();
+  };
+  overlay.querySelector('#save-popup-ok').onclick = close;
+  // Auto-close after 2.5s jika user tidak tap
+  setTimeout(close, 2500);
+}
+
+// ===================================================
 // SAVE ORDER
 // ===================================================
 function saveOrder() {
@@ -2564,12 +2594,11 @@ function saveOrder() {
   }
 
   saveData();
-  // Tampilkan toast dulu, baru pindah halaman biar user jelas lihat notifikasinya
-  toast('✅ Order tersimpan!', 'success');
-  setTimeout(() => {
+  // Popup konfirmasi → langsung pindah ke riwayat order
+  showSavePopup('✅ Order tersimpan!', () => {
     navigate('history');
     setTimeout(() => clearForm(), 100);
-  }, 800);
+  });
 }
 
 function clearForm() {
@@ -2982,10 +3011,15 @@ function saveEditOrder() {
   };
   currentDetailOrder = store.orders[idx];
   saveData();
-  toast('✅ Order berhasil diperbarui!', 'success');
   closeModal('edit-order-modal');
-  refreshDetailBody();
   renderHistory();
+  renderDashboard();
+
+  // Popup konfirmasi + balik ke halaman invoice (detail modal)
+  showSavePopup('✅ Perubahan disimpan!', () => {
+    refreshDetailBody();
+    openModal('detail-modal');
+  });
 }
 
 function deleteOrder(id) {
