@@ -1346,13 +1346,9 @@ body {
           <option value="Lunas">✅ Lunas</option>
         </select>
       </div>
-      <div class="form-group form-full" id="edit-dp-group" style="display:none">
-        <label>Riwayat Pembayaran</label>
-        <div id="edit-dp-inline-list" style="margin-bottom:6px"></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="number" inputmode="numeric" id="edit-dp" placeholder="Jumlah DP awal (Rp)" style="flex:1">
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">💡 Edit nominal langsung di atas, lalu Simpan</div>
+      <div class="form-group" id="edit-dp-group" style="display:none">
+        <label>Jumlah DP Awal (Rp)</label>
+        <input type="number" inputmode="numeric" id="edit-dp" placeholder="0">
       </div>
       <div class="form-group form-full">
         <label>Catatan Produksi</label>
@@ -1702,14 +1698,57 @@ function loadData() {
     if (d) {
       const parsed = JSON.parse(d);
       store = parsed;
-      if (!store.hutang) store.hutang = [];
+      if (!store.hutang)  store.hutang  = [];
       if (!store.piutang) store.piutang = [];
       if (!store.belanja) store.belanja = [];
+      // Bersihkan logoData dari order.shop lama (migrasi data lama)
+      if (store.orders) {
+        store.orders = store.orders.map(o => {
+          if (!o.shop || !o.shop.logoData) return o;
+          const { logoData, ...shopWithoutLogo } = o.shop;
+          return { ...o, shop: shopWithoutLogo };
+        });
+      }
     }
-  } catch(e) {}
+  } catch(e) { console.error('loadData error:', e); }
 }
 function saveData() {
-  localStorage.setItem('sablonpro_v1', JSON.stringify(store));
+  try {
+    // Strip logoData dari setiap order.shop sebelum simpan ke localStorage
+    // Logo tetap ada di store.settings — tidak perlu duplikat di tiap order
+    const toSave = {
+      ...store,
+      orders: (store.orders || []).map(o => {
+        if (!o.shop || !o.shop.logoData) return o;
+        const { logoData, ...shopWithoutLogo } = o.shop;
+        return { ...o, shop: shopWithoutLogo };
+      }),
+    };
+    localStorage.setItem('sablonpro_v1', JSON.stringify(toSave));
+  } catch(e) {
+    if (e.name === 'QuotaExceededError' || (e.message && e.message.toLowerCase().includes('quota'))) {
+      // Coba sekali lagi tanpa logo di settings juga
+      try {
+        const { logoData, ...settingsNoLogo } = store.settings;
+        const toSave2 = {
+          ...store,
+          settings: settingsNoLogo,
+          orders: (store.orders || []).map(o => {
+            if (!o.shop) return o;
+            const { logoData: _l, ...shopWithoutLogo } = o.shop;
+            return { ...o, shop: shopWithoutLogo };
+          }),
+        };
+        localStorage.setItem('sablonpro_v1', JSON.stringify(toSave2));
+        console.warn('Logo dihapus dari penyimpanan karena kapasitas penuh.');
+      } catch(e2) {
+        console.error('saveData gagal total:', e2);
+        throw e2; // biarkan caller tangkap
+      }
+    } else {
+      throw e;
+    }
+  }
 }
 
 // ===================================================
@@ -2183,6 +2222,8 @@ function buildA4Invoice(d) {
   const statusBg   = d.payStatus === 'Lunas' ? '#ECFDF5' : d.payStatus === 'DP' ? '#FFFBEB' : '#FEF2F2';
 
   const shop = d.shop || {};
+  // Logo: ambil dari store.settings kalau tidak ada di snapshot order (hemat storage)
+  const logoData = shop.logoData || store.settings.logoData || '';
   const shopLines = [
     shop.field     ? `<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:1px">${shop.field}</div>` : '',
     shop.address   ? `<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:1px">📍 ${shop.address}</div>` : '',
@@ -2258,7 +2299,7 @@ function buildA4Invoice(d) {
       <div style="background:#1E1B4B;margin:-16px -16px 0;padding:10px 14px;border-radius:10px 10px 0 0">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="display:flex;align-items:center;gap:10px">
-            ${shop.logoData ? `<img src="${shop.logoData}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3)">` : ''}
+            ${logoData ? `<img src="${logoData}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3)">` : ''}
             <div>
               <div style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.3px">${shop.shopname || 'Toko'}</div>
               ${shopLines}
@@ -2529,13 +2570,12 @@ function showSavePopup(message, onDone) {
     document.head.appendChild(style);
   }
   document.body.appendChild(overlay);
-  let closed = false;
   const close = () => {
-    if (closed) return; closed = true;
-    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    document.body.removeChild(overlay);
     if (typeof onDone === 'function') onDone();
   };
   overlay.querySelector('#save-popup-ok').onclick = close;
+  // Auto-close after 1.5s jika user tidak tap
   setTimeout(close, 1500);
 }
 
@@ -2586,7 +2626,7 @@ function saveOrder() {
     deadline: d.deadline,
     notes: d.notes,
     date: new Date().toISOString(),
-    shop: { ...store.settings },
+    shop: (({ logoData, ...rest }) => rest)(store.settings),
     baseHpp,
     hpp: { hppPerPcs, totalHpp, breakdown },
   };
@@ -2922,84 +2962,17 @@ function openEditOrder() {
   document.getElementById('edit-base-price').value = o.base;
   document.getElementById('edit-base-hpp').value = o.baseHpp || o.hpp?.hppPerPcs || '';
   document.getElementById('edit-pay-status').value = o.payStatus;
+  document.getElementById('edit-dp').value = o.dp || '';
+  document.getElementById('edit-dp-group').style.display = o.payStatus === 'DP' ? 'flex' : 'none';
   document.getElementById('edit-notes').value = o.notes || '';
-  renderEditDpInline(o);
   renderEditSizeGrid(o);
   recalcEditSizes();
   openModal('edit-order-modal');
 }
 
-function renderEditDpInline(o) {
-  const grp  = document.getElementById('edit-dp-group');
-  const list = document.getElementById('edit-dp-inline-list');
-  const inp  = document.getElementById('edit-dp');
-  const payStatus = o.payStatus || document.getElementById('edit-pay-status').value;
-
-  if (payStatus !== 'DP') { grp.style.display = 'none'; return; }
-  grp.style.display = '';
-
-  const dpHistory = o.dpHistory || [];
-  if (dpHistory.length > 0) {
-    // Tampilkan setiap cicilan sebagai input yang bisa langsung diedit
-    inp.style.display = 'none';
-    list.innerHTML = dpHistory.map((item, i) => `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <input type="text" value="${item.note || ('DP ke-'+(i+1))}" id="edpi-note-${i}"
-          style="flex:1.2;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg-input);color:var(--text-primary);font-family:'Inter',sans-serif;outline:none">
-        <input type="number" inputmode="numeric" value="${item.amount}" id="edpi-amount-${i}"
-          style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg-input);color:var(--text-primary);font-family:'JetBrains Mono',monospace;outline:none"
-          oninput="recalcEditDpInline()">
-        <button onclick="removeEditDpInlineItem(${i})" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:15px;cursor:pointer;flex-shrink:0">🗑️</button>
-      </div>`).join('');
-    list.innerHTML += `
-      <div id="edpi-sisa-box" style="font-size:12px;color:var(--text-secondary);padding:4px 2px"></div>
-      <button onclick="addEditDpInlineItem()" style="width:100%;padding:8px;border:1.5px dashed var(--border);border-radius:8px;background:none;color:var(--brand);font-size:13px;font-weight:600;cursor:pointer;margin-top:2px">+ Tambah Cicilan</button>`;
-    recalcEditDpInline();
-  } else {
-    // Belum ada dpHistory — tampilkan field tunggal
-    list.innerHTML = '';
-    inp.style.display = '';
-    inp.value = o.dp || '';
-  }
-}
-
-function recalcEditDpInline() {
-  const o = currentDetailOrder;
-  if (!o) return;
-  const dpHistory = o.dpHistory || [];
-  let total = 0;
-  dpHistory.forEach((_, i) => {
-    const el = document.getElementById(`edpi-amount-${i}`);
-    if (el) total += parseFloat(el.value) || 0;
-  });
-  const sisa = Math.max(0, (o.totalRevenue || 0) - total);
-  const box = document.getElementById('edpi-sisa-box');
-  if (box) box.innerHTML = `Total dibayar: <strong>${fmtRp(total)}</strong> &nbsp;|&nbsp; Sisa: <strong style="color:${sisa>0?'var(--danger)':'var(--success)'}">${fmtRp(sisa)}</strong>`;
-}
-
-function removeEditDpInlineItem(i) {
-  const o = currentDetailOrder;
-  if (!o || !o.dpHistory) return;
-  o.dpHistory.splice(i, 1);
-  renderEditDpInline(o);
-}
-
-function addEditDpInlineItem() {
-  const o = currentDetailOrder;
-  if (!o) return;
-  if (!o.dpHistory) o.dpHistory = [];
-  const tgl = new Date().toISOString().split('T')[0];
-  o.dpHistory.push({ amount: 0, note: `DP ke-${o.dpHistory.length + 1}`, date: tgl });
-  renderEditDpInline(o);
-}
-
 function toggleEditDp() {
   const v = document.getElementById('edit-pay-status').value;
-  const o = currentDetailOrder;
-  if (!o) return;
-  // Sync payStatus sementara ke o supaya renderEditDpInline bisa baca
-  const oTemp = { ...o, payStatus: v };
-  renderEditDpInline(oTemp);
+  document.getElementById('edit-dp-group').style.display = v === 'DP' ? 'flex' : 'none';
 }
 
 function renderEditSizeGrid(o) {
@@ -3068,90 +3041,37 @@ function recalcEditSizes() {
 function saveEditOrder() {
   const o = currentDetailOrder;
   if (!o) return;
-  const customer = document.getElementById('edit-customer').value.trim();
+  const customer = document.getElementById('edit-customer').value;
   if (!customer) { toast('⚠️ Nama pelanggan wajib diisi!', 'warn'); return; }
+  const base    = parseFloat(document.getElementById('edit-base-price').value) || o.base;
+  const baseHpp = parseFloat(document.getElementById('edit-base-hpp').value) || o.baseHpp || 0;
+  const sizes   = getEditSizeData();
+  const totalQty     = sizes.reduce((a,s)=>a+s.qty,0);
+  const totalRevenue = sizes.reduce((a,s)=>a+s.qty*(base+s.add),0);
+  const payStatus = document.getElementById('edit-pay-status').value;
+  const dp   = payStatus === 'DP' ? (parseFloat(document.getElementById('edit-dp').value)||o.dp||0) : (payStatus==='Lunas'?totalRevenue:0);
+  const sisa = payStatus==='Lunas' ? 0 : payStatus==='DP' ? totalRevenue-dp : totalRevenue;
 
-  const base       = parseFloat(document.getElementById('edit-base-price').value) || o.base;
-  const baseHpp    = parseFloat(document.getElementById('edit-base-hpp').value) || o.baseHpp || 0;
-  const editSizes  = getEditSizeData();
-  const sizes      = editSizes.length > 0 ? editSizes : o.sizes;
-  const totalQty     = sizes.reduce((a,s)=>a+s.qty, 0);
-  const totalRevenue = sizes.reduce((a,s)=>a+s.qty*(base+s.add), 0);
-  const payStatus    = document.getElementById('edit-pay-status').value;
-  const tglOrder     = o.date ? o.date.split('T')[0] : new Date().toISOString().split('T')[0];
-
-  // ── Baca dpHistory dari inline inputs (jika ada) ──
-  let newDpHistory = [];
-  if (payStatus === 'DP' && o.dpHistory && o.dpHistory.length > 0) {
-    // Baca dari input inline yang dirender
-    o.dpHistory.forEach((item, i) => {
-      const noteEl   = document.getElementById(`edpi-note-${i}`);
-      const amountEl = document.getElementById(`edpi-amount-${i}`);
-      if (amountEl) {
-        newDpHistory.push({
-          note:   noteEl ? noteEl.value : (item.note || `DP ke-${i+1}`),
-          amount: parseFloat(amountEl.value) || 0,
-          date:   item.date || tglOrder,
-        });
-      }
-    });
-    // Hanya simpan yang amount > 0
-    newDpHistory = newDpHistory.filter(x => x.amount > 0);
-  } else if (payStatus === 'DP') {
-    // Belum ada dpHistory — pakai field tunggal edit-dp
-    const dpVal = parseFloat(document.getElementById('edit-dp').value) || 0;
-    if (dpVal > 0) {
-      newDpHistory = [{ amount: dpVal, note: 'DP ke-1', date: tglOrder }];
-    }
-  }
-
-  // ── Hitung dp & sisa ──
-  let dp, sisa;
-  if (payStatus === 'Lunas') {
-    dp = totalRevenue; sisa = 0;
-    newDpHistory = o.dpHistory ? [...o.dpHistory] : []; // tetap simpan riwayat cicilan lama
-  } else if (payStatus === 'DP') {
-    dp   = newDpHistory.reduce((a,x)=>a+x.amount, 0);
-    sisa = Math.max(0, totalRevenue - dp);
-  } else {
-    dp = 0; sisa = totalRevenue; newDpHistory = [];
-  }
-
-  // ── Rebuild semua cashflow terkait invNo ini dari nol ──
-  store.cashflow = store.cashflow.filter(c => !c.desc.includes(o.invNo));
-
-  // Pemasukan dari dpHistory / status
-  if (payStatus === 'Lunas') {
-    if (newDpHistory.length > 0) {
-      newDpHistory.forEach((item, i) => {
-        store.cashflow.push({ id: Date.now()+i, type:'in', desc:`${item.note||('DP ke-'+(i+1))} — ${o.invNo} (${customer})`, amount:item.amount, date:item.date||tglOrder, category:'Penjualan' });
-      });
-      const totalPaid = newDpHistory.reduce((a,x)=>a+x.amount, 0);
-      if (totalPaid < totalRevenue) {
-        store.cashflow.push({ id: Date.now()+100, type:'in', desc:`Pelunasan — ${o.invNo} (${customer})`, amount:totalRevenue-totalPaid, date:tglOrder, category:'Penjualan' });
-      }
-    } else {
-      store.cashflow.push({ id: Date.now()+1, type:'in', desc:`Lunas — ${o.invNo} (${customer})`, amount:totalRevenue, date:tglOrder, category:'Penjualan' });
-    }
-  } else if (payStatus === 'DP') {
-    newDpHistory.forEach((item, i) => {
-      store.cashflow.push({ id: Date.now()+i, type:'in', desc:`${item.note||('DP ke-'+(i+1))} — ${o.invNo} (${customer})`, amount:item.amount, date:item.date||tglOrder, category:'Penjualan' });
-    });
-  }
-  // Belum Bayar → tidak ada pemasukan
-
-  // HPP pengeluaran
+  // Update HPP cashflow entries — hapus yang lama, buat yang baru
+  store.cashflow = store.cashflow.filter(c => !(c.type==='out' && c.desc.includes(o.invNo) && c.desc.startsWith('HPP')));
   if (baseHpp > 0 && totalQty > 0) {
-    const bd = { bahan: Math.round(baseHpp*0.55), sablon: Math.round(baseHpp*0.45) };
-    if (bd.bahan > 0)  store.cashflow.push({ id: Date.now()+200, type:'out', desc:`HPP Bahan — ${o.invNo} (${customer})`,         amount:bd.bahan  *totalQty, date:tglOrder, category:'Biaya Produksi' });
-    if (bd.sablon > 0) store.cashflow.push({ id: Date.now()+201, type:'out', desc:`HPP Sablon/Bordir — ${o.invNo} (${customer})`, amount:bd.sablon *totalQty, date:tglOrder, category:'Biaya Produksi' });
+    const tgl = o.date || new Date().toISOString().split('T')[0];
+    const breakdown = { bahan: Math.round(baseHpp*0.55), sablon: Math.round(baseHpp*0.45) };
+    if (breakdown.bahan > 0)  store.cashflow.push({ id: Date.now()+2, type:'out', desc:`HPP Bahan — ${o.invNo} (${customer})`,         amount: breakdown.bahan  * totalQty, date: tgl, category:'Biaya Produksi' });
+    if (breakdown.sablon > 0) store.cashflow.push({ id: Date.now()+3, type:'out', desc:`HPP Sablon/Bordir — ${o.invNo} (${customer})`, amount: breakdown.sablon * totalQty, date: tgl, category:'Biaya Produksi' });
   }
 
-  // ── Update order ──
+  // Update pemasukan cashflow jika revenue berubah (update amount di entry yang ada)
+  store.cashflow.forEach(c => {
+    if (c.type==='in' && c.desc.includes(o.invNo)) {
+      if (payStatus==='Lunas') c.amount = totalRevenue;
+    }
+  });
+
   const idx = store.orders.findIndex(x=>x.id===o.id);
   if (idx < 0) return;
-  const newHppPerPcs = baseHpp > 0 ? baseHpp : (totalQty > 0 ? totalRevenue/totalQty*0.5 : 0);
-  const newTotalHpp  = sizes.reduce((a,s)=>{ const h=baseHpp>0?(baseHpp+s.add):newHppPerPcs; return a+h*s.qty; }, 0);
+  const newHppPerPcs = baseHpp > 0 ? baseHpp : (totalQty > 0 ? totalRevenue / totalQty * 0.5 : 0);
+  const newTotalHpp  = baseHpp > 0 ? baseHpp * totalQty : 0;
   store.orders[idx] = {
     ...o,
     customer,
@@ -3159,10 +3079,16 @@ function saveEditOrder() {
     deadline: document.getElementById('edit-deadline').value,
     address:  document.getElementById('edit-address').value,
     product:  document.getElementById('edit-product').value,
-    base, baseHpp, sizes, totalQty, totalRevenue,
-    payStatus, dp, sisa,
-    dpHistory: newDpHistory,
+    base,
+    baseHpp,
+    sizes:        sizes.length > 0 ? sizes : o.sizes,
+    totalQty:     sizes.length > 0 ? totalQty : o.totalQty,
+    totalRevenue: sizes.length > 0 ? totalRevenue : o.totalRevenue,
+    payStatus,
+    dp,
+    sisa,
     notes: document.getElementById('edit-notes').value,
+    baseHpp,
     hpp: { hppPerPcs: newHppPerPcs, totalHpp: newTotalHpp, breakdown: { bahan: Math.round(baseHpp*0.55), sablon: Math.round(baseHpp*0.45), afdruk: 0 } },
   };
   currentDetailOrder = store.orders[idx];
@@ -3171,6 +3097,7 @@ function saveEditOrder() {
   renderHistory();
   renderDashboard();
 
+  // Popup konfirmasi + balik ke halaman invoice (detail modal)
   showSavePopup('✅ Perubahan disimpan!', () => {
     refreshDetailBody();
     openModal('detail-modal');
