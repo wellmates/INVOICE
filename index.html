@@ -2537,9 +2537,11 @@ function showSavePopup(message, onDone) {
 // ===================================================
 function saveOrder() {
   const btn = document.getElementById('btn-save-order');
-  const customer = document.getElementById('f-customer').value;
-  const product = document.getElementById('f-product').value;
-  if (!customer || !product) { toast('⚠️ Nama pelanggan dan produk wajib diisi!', 'warn'); return; }
+  const customer = document.getElementById('f-customer').value.trim();
+  if (!customer) {
+    toast('⚠️ Nama pelanggan wajib diisi!', 'warn');
+    return;
+  }
 
   // Visual feedback on button — prevent double tap
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyimpan...'; btn.style.background = '#94A3B8'; }
@@ -2784,7 +2786,7 @@ function saveEditDpItem(i) {
   const newNote   = document.getElementById(`edp-note-${i}`).value;
   const newAmount = parseFloat(document.getElementById(`edp-amount-${i}`).value) || 0;
   const oldAmount = o.dpHistory[i].amount;
-  const diff = newAmount - oldAmount;
+  const oldNote   = o.dpHistory[i].note;
 
   // Update dpHistory entry
   o.dpHistory[i].note   = newNote;
@@ -2797,14 +2799,14 @@ function saveEditDpItem(i) {
   if (o.sisa <= 0) { o.sisa = 0; o.payStatus = 'Lunas'; }
   else o.payStatus = 'DP';
 
-  // Update corresponding cashflow entry (match by desc containing invNo + old note) — try to find & fix amount
+  // Update corresponding cashflow entry — pakai oldNote & oldAmount buat match yang tepat
   const cfIdx = store.cashflow.findIndex(c =>
     c.type === 'in' && c.desc.includes(o.invNo) &&
-    (c.desc.includes(o.dpHistory[i].note) || c.amount === oldAmount)
+    (c.desc.includes(oldNote || '') || c.amount === oldAmount)
   );
   if (cfIdx >= 0) {
     store.cashflow[cfIdx].amount = newAmount;
-    store.cashflow[cfIdx].desc = `${newNote} ${o.invNo} — ${o.customer}`;
+    store.cashflow[cfIdx].desc = `${newNote} — ${o.invNo} (${o.customer})`;
   }
 
   // Update in store
