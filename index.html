@@ -884,6 +884,11 @@ body {
           <button class="produk-btn" data-produk="Workjacket" onclick="setProduk('Workjacket',this)">Workjacket</button>
         </div>
 
+        <div class="form-group mt-8" style="margin-top:8px">
+          <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Barang Lainnya (Opsional)</label>
+          <input type="text" id="f-custom-product" placeholder="Contoh: Topi, Tas, Jaket Hoodie..." style="font-size:13px;padding:8px 10px" oninput="onCustomProdukChange()">
+        </div>
+
         <div id="cutting-section">
           <div class="card-title" style="margin-bottom:8px" id="cutting-label">Cutting Kaos</div>
           <div class="cutting-btns" id="cutting-btns"></div>
@@ -1831,16 +1836,23 @@ function saveSettings() {
 // ===================================================
 // PRODUK TYPE & CUTTING
 // ===================================================
+// Universal size styles untuk semua barang
+const UNIVERSAL_STYLES = ['REGULER', 'BOXY', 'OVERSIZE', 'CUSTOM'];
+
 const CUTTING_MAP = {
-  'Kaos':      ['Reguler','Boxy','Oversize'],
-  'Jaket':     ['Reguler','Oversize'],
-  'Workshirt': ['Reguler','Slim'],
-  'Workjacket':['Reguler','Oversize'],
+  'Kaos':      UNIVERSAL_STYLES,
+  'Jaket':     UNIVERSAL_STYLES,
+  'Workshirt': UNIVERSAL_STYLES,
+  'Workjacket': UNIVERSAL_STYLES,
+  // Custom products juga punya style yg sama
 };
 let currentProduk = 'Kaos';
-let currentCutting = 'Reguler';
+let currentCutting = 'REGULER';
+let customProduk = ''; // untuk custom product name
 
 function setProduk(produk, el) {
+  customProduk = ''; // clear custom product
+  document.getElementById('f-custom-product').value = '';
   currentProduk = produk;
   document.querySelectorAll('.produk-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
@@ -1849,14 +1861,36 @@ function setProduk(produk, el) {
   updateProdukSummary();
 }
 
+function onCustomProdukChange() {
+  const customVal = document.getElementById('f-custom-product').value.trim();
+  if (customVal) {
+    customProduk = customVal;
+    // Remove active state dari semua produk buttons
+    document.querySelectorAll('.produk-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('f-model').value = customVal;
+  } else {
+    customProduk = '';
+    document.getElementById('f-model').value = currentProduk;
+  }
+  renderCuttingBtns();
+  updateProdukSummary();
+}
+
 function renderCuttingBtns() {
-  const cuts = CUTTING_MAP[currentProduk] || ['Reguler'];
+  const cuts = UNIVERSAL_STYLES;
   currentCutting = cuts[0];
-  document.getElementById('cutting-label').textContent = 'Cutting ' + currentProduk;
+  
+  let produkLabel = currentProduk;
+  if (customProduk) produkLabel = customProduk;
+  
+  document.getElementById('cutting-label').textContent = 'Style ' + produkLabel;
   const wrap = document.getElementById('cutting-btns');
   wrap.innerHTML = cuts.map((c,i) =>
     `<button class="cutting-btn${i===0?' active':''}" onclick="setCutting('${c}',this)">${c}</button>`
   ).join('');
+  
+  // Tambah custom input jika pilih CUSTOM
+  updateStyleCustomInput();
   updateProdukSummary();
 }
 
@@ -1864,12 +1898,39 @@ function setCutting(cutting, el) {
   currentCutting = cutting;
   document.querySelectorAll('.cutting-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
+  updateStyleCustomInput();
   updateProdukSummary();
+}
+
+function updateStyleCustomInput() {
+  const container = document.getElementById('cutting-btns');
+  if (!container) return;
+  
+  // Remove previous custom input jika ada
+  const prevCustom = document.getElementById('style-custom-input-wrapper');
+  if (prevCustom) prevCustom.remove();
+  
+  // Add custom input jika cutting = CUSTOM
+  if (currentCutting === 'CUSTOM') {
+    const customInputHTML = `
+      <div id="style-custom-input-wrapper" style="margin-top:8px">
+        <input type="text" id="style-custom-value" placeholder="Contoh: SLIM, SUPER OVERSIZE, dll" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="updateProdukSummary()">
+      </div>
+    `;
+    container.insertAdjacentHTML('afterend', customInputHTML);
+  }
 }
 
 function updateProdukSummary() {
   const el = document.getElementById('produk-summary');
-  if (el) el.textContent = currentProduk + ' — Cutting ' + currentCutting;
+  if (el) {
+    let prodName = customProduk || currentProduk;
+    let styleName = currentCutting;
+    if (currentCutting === 'CUSTOM') {
+      styleName = document.getElementById('style-custom-value')?.value || 'CUSTOM';
+    }
+    el.textContent = prodName + ' — ' + styleName;
+  }
 }
 
 // ===================================================
@@ -2091,13 +2152,22 @@ function getFormData() {
   const payStatus = document.getElementById('f-payment-status')?.value || 'Belum Bayar';
   const sisa = payStatus === 'DP' ? totalRevenue - dp : (payStatus === 'Lunas' ? 0 : totalRevenue);
 
+  // Handle custom style (jika CUSTOM dipilih)
+  let styleName = currentCutting;
+  if (currentCutting === 'CUSTOM') {
+    styleName = document.getElementById('style-custom-value')?.value || 'CUSTOM';
+  }
+  
+  let prodName = customProduk || currentProduk;
+  const modelDisplay = prodName + ' — ' + styleName;
+
   return {
     invNo: 'INV-' + String(store.invoiceCounter).padStart(4, '0'),
     customer: document.getElementById('f-customer')?.value || '-',
     phone: document.getElementById('f-phone')?.value || '',
     address: document.getElementById('f-address')?.value || '',
     product: document.getElementById('f-product')?.value || '-',
-    model: currentProduk + ' — Cutting ' + currentCutting,
+    model: modelDisplay,
     base, sizes, totalQty, totalRevenue, dp, payStatus, sisa,
     deadline: document.getElementById('f-deadline')?.value || '',
     notes: document.getElementById('f-notes')?.value || '',
@@ -2109,139 +2179,138 @@ function getFormData() {
 function buildA4Invoice(d) {
   const rows = d.sizes.map(s =>
     `<tr>
-      <td style="font-weight:700;color:#0F172A;font-size:12px">${s.label}</td>
-      <td style="text-align:center;font-size:12px">${s.qty}</td>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${fmtRp(d.base + s.add)}</td>
-      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0F172A">${fmtRp(s.qty * (d.base + s.add))}</td>
+      <td style="font-weight:700;color:#0F172A;font-size:11px;padding:3px 4px">${s.label}</td>
+      <td style="text-align:center;font-size:11px;padding:3px 4px">${s.qty}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 4px">${fmtRp(d.base + s.add)}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#0F172A;padding:3px 4px">${fmtRp(s.qty * (d.base + s.add))}</td>
     </tr>`
   ).join('');
   const statusColor = d.payStatus === 'Lunas' ? '#059669' : d.payStatus === 'DP' ? '#D97706' : '#DC2626';
   const statusBg   = d.payStatus === 'Lunas' ? '#ECFDF5' : d.payStatus === 'DP' ? '#FFFBEB' : '#FEF2F2';
 
   const shopLines = [
-    d.shop.field     ? `<div style="font-size:11px;color:#475569;margin-top:1px">${d.shop.field}</div>` : '',
-    d.shop.address   ? `<div style="font-size:10px;color:#64748B;margin-top:1px">📍 ${d.shop.address}</div>` : '',
-    (d.shop.phone || d.shop.email) ? `<div style="font-size:10px;color:#64748B;margin-top:1px">${[d.shop.phone ? '📞 '+d.shop.phone : '', d.shop.email ? '✉️ '+d.shop.email : ''].filter(Boolean).join('  ')}</div>` : '',
+    d.shop.field     ? `<div style="font-size:10px;color:#475569;margin-top:1px">${d.shop.field}</div>` : '',
+    d.shop.address   ? `<div style="font-size:9px;color:#64748B;margin-top:1px">📍 ${d.shop.address}</div>` : '',
+    (d.shop.phone || d.shop.email) ? `<div style="font-size:9px;color:#64748B;margin-top:1px">${[d.shop.phone ? '📞 '+d.shop.phone : '', d.shop.email ? '✉️ '+d.shop.email : ''].filter(Boolean).join('  ')}</div>` : '',
   ].join('');
 
   const paymentBlock = () => {
     if (d.payStatus === 'Lunas' && (!d.dpHistory || d.dpHistory.length === 0)) {
-      return `<div style="margin-top:6px;font-size:11px;font-weight:700;color:#059669">✅ LUNAS</div>`;
+      return `<div style="margin-top:4px;font-size:10px;font-weight:700;color:#059669">✅ LUNAS</div>`;
     }
     if (d.dpHistory && d.dpHistory.length > 0) {
       const dpRows = d.dpHistory.map((dp,i) => `
-        <div style="display:flex;justify-content:space-between;font-size:11px;opacity:.8;margin-top:2px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;opacity:.8;margin-top:1px">
           <span>${dp.note || `DP ke-${i+1}`}</span><span style="font-family:'JetBrains Mono',monospace">${fmtRp(dp.amount)}</span>
         </div>`).join('');
       const totalPaid = d.dpHistory.reduce((a,x)=>a+x.amount,0);
       if (d.payStatus === 'Lunas') {
-        return `<div style="margin-top:6px;border-top:1px dashed rgba(255,255,255,.25);padding-top:6px">
+        return `<div style="margin-top:4px;border-top:1px dashed rgba(255,255,255,.25);padding-top:4px">
           ${dpRows}
-          <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px;font-weight:700;color:#34D399"><span>TOTAL DIBAYAR</span><span style="font-family:'JetBrains Mono',monospace">${fmtRp(totalPaid)}</span></div>
-          <div style="margin-top:4px;font-size:11px;font-weight:700;color:#34D399">✅ LUNAS</div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:2px;font-weight:700;color:#34D399"><span>TOTAL DIBAYAR</span><span style="font-family:'JetBrains Mono',monospace">${fmtRp(totalPaid)}</span></div>
+          <div style="margin-top:2px;font-size:10px;font-weight:700;color:#34D399">✅ LUNAS</div>
         </div>`;
       }
-      return `<div style="margin-top:6px;border-top:1px dashed rgba(255,255,255,.25);padding-top:6px">
+      return `<div style="margin-top:4px;border-top:1px dashed rgba(255,255,255,.25);padding-top:4px">
         ${dpRows}
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;margin-top:5px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;margin-top:3px">
           <span>SISA TAGIHAN</span><span style="font-family:'JetBrains Mono',monospace;color:#FBBF24">${fmtRp(d.sisa)}</span>
         </div>
       </div>`;
     }
     if (d.payStatus === 'DP') {
       return `
-        <div style="margin-top:6px;border-top:1px dashed rgba(255,255,255,.25);padding-top:6px">
-          <div style="display:flex;justify-content:space-between;font-size:11px;opacity:.8">
+        <div style="margin-top:4px;border-top:1px dashed rgba(255,255,255,.25);padding-top:4px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;opacity:.8">
             <span>DP Dibayar</span><span style="font-family:'JetBrains Mono',monospace">${fmtRp(d.dp)}</span>
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;margin-top:3px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;margin-top:2px">
             <span>SISA TAGIHAN</span><span style="font-family:'JetBrains Mono',monospace;color:#FBBF24">${fmtRp(d.sisa)}</span>
           </div>
         </div>`;
     }
-    return `<div style="margin-top:6px;font-size:11px;font-weight:700;color:#FCA5A5">⏳ BELUM BAYAR</div>`;
+    return `<div style="margin-top:4px;font-size:10px;font-weight:700;color:#FCA5A5">⏳ BELUM BAYAR</div>`;
   };
 
   const rekeningBlock = d.shop.bankNo ? `
-    <div style="margin-top:12px;border:1.5px solid #1E1B4B;border-radius:8px;overflow:hidden">
-      <div style="background:#1E1B4B;padding:8px 12px">
-        <div style="color:#fff;font-size:11px;font-weight:700;letter-spacing:.5px">💳 INFORMASI PEMBAYARAN</div>
+    <div style="margin-top:8px;border:1px solid #1E1B4B;border-radius:6px;overflow:hidden">
+      <div style="background:#1E1B4B;padding:6px 10px">
+        <div style="color:#fff;font-size:9px;font-weight:700;letter-spacing:.4px">💳 PEMBAYARAN</div>
       </div>
-      <div style="padding:10px 12px;background:#F8FAFC">
-        <div style="font-size:11px;color:#475569;margin-bottom:6px;line-height:1.5">Pembayaran invoice ini bisa melalui tunai atau transfer melalui Rekening bank di bawah ini.</div>
-        <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
-          <div style="background:#1E1B4B;color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:4px">${d.shop.bankName || 'BANK'}</div>
+      <div style="padding:8px 10px;background:#F8FAFC">
+        <div style="font-size:9px;color:#475569;margin-bottom:4px;line-height:1.4">Transfer ke rekening bank di bawah</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+          <div style="background:#1E1B4B;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:3px">${d.shop.bankName || 'BANK'}</div>
           <div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#0F172A;letter-spacing:1px">${d.shop.bankNo}</div>
-            <div style="font-size:10px;color:#64748B;margin-top:1px">a/n <strong>${d.shop.bankOwner || d.shop.shopname}</strong></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0F172A;letter-spacing:.5px">${d.shop.bankNo}</div>
+            <div style="font-size:8px;color:#64748B;margin-top:.5px">a/n ${d.shop.bankOwner || d.shop.shopname}</div>
           </div>
         </div>
       </div>
     </div>` : '';
 
   return `
-    <div class="invoice-preview" id="a4-invoice-content">
+    <div class="invoice-preview" id="a4-invoice-content" style="padding:12px;margin:0">
       <!-- HEADER TOKO -->
-      <div style="background:#1E1B4B;margin:-16px -16px 0;padding:14px 16px;border-radius:10px 10px 0 0">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div style="display:flex;align-items:center;gap:12px">
-            ${d.shop.logoData ? `<img src="${d.shop.logoData}" style="width:64px;height:64px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3)">` : ''}
-            <div>
-              <div style="font-size:18px;font-weight:800;color:#fff;letter-spacing:-.3px">${d.shop.shopname}</div>
+      <div style="background:#1E1B4B;margin:-12px -12px 0;padding:10px 12px;border-radius:8px 8px 0 0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            ${d.shop.logoData ? `<img src="${d.shop.logoData}" style="width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.2)">` : ''}
+            <div style="min-width:0">
+              <div style="font-size:15px;font-weight:800;color:#fff;letter-spacing:-.2px">${d.shop.shopname}</div>
               ${shopLines}
             </div>
           </div>
-          <div style="text-align:right;flex-shrink:0;margin-left:8px">
-            <div style="background:rgba(255,255,255,.15);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:4px;letter-spacing:.5px">${d.invNo}</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.6);margin-top:4px">${d.date}</div>
-            <div style="background:${statusBg};color:${statusColor};font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;margin-top:4px;display:inline-block">${d.payStatus.toUpperCase()}</div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="background:rgba(255,255,255,.15);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:3px;letter-spacing:.4px">${d.invNo}</div>
+            <div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:2px">${d.date}</div>
+            <div style="background:${statusBg};color:${statusColor};font-size:9px;font-weight:800;padding:1px 6px;border-radius:3px;margin-top:2px;display:inline-block">${d.payStatus.toUpperCase()}</div>
           </div>
         </div>
       </div>
 
       <!-- PELANGGAN & PRODUK -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 10px;padding-bottom:10px;border-bottom:1.5px solid #E2E8F0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;padding-bottom:8px;border-bottom:1px solid #E2E8F0">
         <div>
-          <div style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#94A3B8;margin-bottom:4px">Kepada</div>
-          <div style="font-size:13px;font-weight:800;color:#0F172A">${d.customer}</div>
-          ${d.phone   ? `<div style="font-size:10px;color:#64748B;margin-top:2px">📞 ${d.phone}</div>` : ''}
-          ${d.address ? `<div style="font-size:10px;color:#64748B;margin-top:1px">📍 ${d.address}</div>` : ''}
+          <div style="font-size:8px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#94A3B8;margin-bottom:2px">Kepada</div>
+          <div style="font-size:12px;font-weight:800;color:#0F172A">${d.customer}</div>
+          ${d.phone   ? `<div style="font-size:9px;color:#64748B;margin-top:1px">📞 ${d.phone}</div>` : ''}
+          ${d.address ? `<div style="font-size:9px;color:#64748B;margin-top:.5px">📍 ${d.address}</div>` : ''}
         </div>
         <div>
-          <div style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#94A3B8;margin-bottom:4px">Pesanan</div>
-          <div style="font-size:13px;font-weight:800;color:#0F172A">${d.product}</div>
-          <div style="font-size:10px;color:#64748B;margin-top:2px">${d.model}</div>
-          ${d.deadline ? `<div style="font-size:10px;color:#DC2626;font-weight:700;margin-top:2px">📅 Deadline: ${new Date(d.deadline).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</div>` : ''}
+          <div style="font-size:8px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#94A3B8;margin-bottom:2px">Pesanan</div>
+          <div style="font-size:12px;font-weight:800;color:#0F172A">${d.product}</div>
+          <div style="font-size:9px;color:#64748B;margin-top:1px">${d.model}</div>
+          ${d.deadline ? `<div style="font-size:9px;color:#DC2626;font-weight:700;margin-top:1px">📅 ${new Date(d.deadline).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</div>` : ''}
         </div>
       </div>
 
       <!-- RINCIAN SIZE -->
-      <div style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#94A3B8;margin-bottom:6px">Rincian Size</div>
-      <table class="inv-size-table">
+      <div style="font-size:8px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#94A3B8;margin-bottom:4px">Rincian Size</div>
+      <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:8px">
         <thead>
           <tr style="background:#F1F5F9">
-            <th style="font-size:10px;font-weight:800;color:#334155">Size</th>
-            <th style="font-size:10px;font-weight:800;color:#334155;text-align:center">Qty</th>
-            <th style="font-size:10px;font-weight:800;color:#334155">Harga/pcs</th>
-            <th style="font-size:10px;font-weight:800;color:#334155;text-align:right">Subtotal</th>
+            <th style="font-size:9px;font-weight:800;color:#334155;text-align:left;padding:2px 4px;border-bottom:1px solid #E2E8F0">Size</th>
+            <th style="font-size:9px;font-weight:800;color:#334155;text-align:center;padding:2px 4px;border-bottom:1px solid #E2E8F0">Qty</th>
+            <th style="font-size:9px;font-weight:800;color:#334155;text-align:left;padding:2px 4px;border-bottom:1px solid #E2E8F0">Harga/pcs</th>
+            <th style="font-size:9px;font-weight:800;color:#334155;text-align:right;padding:2px 4px;border-bottom:1px solid #E2E8F0">Subtotal</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:12px;font-size:11px">Belum ada size dipilih</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:8px;font-size:10px">Belum ada size</td></tr>'}</tbody>
       </table>
 
       <!-- TOTAL BOX -->
-      <div class="inv-total-box" style="margin-top:10px">
+      <div style="background:#1E1B4B;color:#fff;border-radius:5px;padding:8px 10px;display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div>
-          <div class="inv-total-label" style="font-size:11px;font-weight:600">Total (${d.totalQty} pcs)</div>
-          <div class="inv-total-value" style="font-size:18px;margin-top:2px">${fmtRp(d.totalRevenue)}</div>
+          <div style="font-size:9px;opacity:.7">Total (${d.totalQty} pcs)</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;margin-top:1px">${fmtRp(d.totalRevenue)}</div>
           ${paymentBlock()}
         </div>
       </div>
 
-      ${d.notes ? `<div class="inv-notes" style="margin-top:10px">📝 ${d.notes}</div>` : ''}
+      ${d.notes ? `<div style="background:#FFFBEB;border-left:2px solid #F59E0B;padding:6px 8px;border-radius:3px;font-size:9px;color:#78350F;margin-bottom:8px">📝 ${d.notes}</div>` : ''}
 
       ${rekeningBlock}
-      <div style="height:4px"></div>
     </div>`;
 }
 
