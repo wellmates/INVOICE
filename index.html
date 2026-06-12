@@ -1241,6 +1241,18 @@ body {
         </div>
       </div>
     </div>
+    <!-- BACKUP & RESTORE -->
+    <div style="margin-top:16px">
+      <div class="card-title" style="margin-bottom:10px">🗂️ Backup & Restore Data</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Export semua data (order, keuangan, pengaturan) ke file JSON untuk backup, atau import dari file JSON yang sudah ada.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline flex-1" onclick="exportDataJSON()" style="font-size:13px">📤 Export JSON</button>
+        <label class="btn btn-outline flex-1" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px">
+          📥 Import JSON
+          <input type="file" id="import-json-file" accept=".json" style="display:none" onchange="importDataJSON(this)">
+        </label>
+      </div>
+    </div>
     <div class="flex gap-8 mt-16">
       <button class="btn btn-outline flex-1" onclick="closeModal('settings-modal')">Batal</button>
       <button class="btn btn-primary flex-1" onclick="saveSettings()">💾 Simpan</button>
@@ -1293,7 +1305,8 @@ body {
     <div class="flex gap-8 mt-12" style="flex-wrap:wrap">
       <button class="btn btn-outline btn-sm flex-1" onclick="printDetailInvoice()">🖨️ Print</button>
       <button class="btn btn-wa btn-sm flex-1" onclick="copyDetailWA()">📲 WA</button>
-      <button class="btn btn-primary btn-sm flex-1" onclick="openEditOrder()">✏️ Edit</button>
+      <button class="btn btn-primary btn-sm flex-1" onclick="shareInvoicePDF()">📄 PDF</button>
+      <button class="btn btn-outline btn-sm flex-1" onclick="openEditOrder()">✏️ Edit</button>
       <button class="btn btn-success btn-sm" onclick="openAddDp()" title="Tambah DP/Pelunasan">💳+</button>
       <button class="btn btn-outline btn-sm" onclick="openEditDp()" title="Edit Riwayat DP">🖊️</button>
       <button class="btn btn-danger btn-sm" id="delete-order-btn">🗑️</button>
@@ -3971,6 +3984,169 @@ document.getElementById('f-payment-status').addEventListener('change', function(
   document.getElementById('dp-group').style.display = this.value === 'DP' ? 'flex' : 'none';
   recalculate();
 });
+
+// ===================================================
+// EXPORT / IMPORT JSON BACKUP
+// ===================================================
+function exportDataJSON() {
+  try {
+    const toExport = {
+      ...store,
+      // Sertakan logo data juga untuk backup lengkap
+    };
+    const json = JSON.stringify(toExport, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const now  = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const shopName = (store.settings.shopname || 'SablonPro').replace(/[^a-zA-Z0-9]/g, '_');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BACKUP_${shopName}_${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('✅ Data berhasil di-export!', 'success');
+  } catch(e) {
+    toast('❌ Gagal export: ' + e.message, 'error');
+    console.error('exportDataJSON error:', e);
+  }
+}
+
+function importDataJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      // Validasi: minimal harus punya struktur dasar
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.orders)) {
+        toast('❌ File JSON tidak valid / bukan backup SablonPro!', 'error');
+        return;
+      }
+      // Tampilkan konfirmasi sebelum overwrite
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+      overlay.innerHTML = `
+        <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;max-width:320px;width:100%;box-shadow:var(--shadow-lg)">
+          <div style="font-size:32px;text-align:center;margin-bottom:12px">📥</div>
+          <div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:6px">Import Data?</div>
+          <div style="font-size:13px;color:var(--text-muted);text-align:center;margin-bottom:20px">
+            Semua data saat ini akan <strong style="color:var(--danger)">ditimpa</strong> dengan data dari file backup ini.<br><br>
+            <span style="font-size:12px">📦 ${parsed.orders.length} order · ${(parsed.cashflow||[]).length} transaksi</span>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button id="imp-cancel" class="btn btn-outline flex-1">Batal</button>
+            <button id="imp-confirm" class="btn btn-primary flex-1">✅ Import</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#imp-cancel').onclick = () => { document.body.removeChild(overlay); input.value = ''; };
+      overlay.querySelector('#imp-confirm').onclick = () => {
+        document.body.removeChild(overlay);
+        store = parsed;
+        if (!store.hutang)  store.hutang  = [];
+        if (!store.piutang) store.piutang = [];
+        if (!store.belanja) store.belanja = [];
+        if (!store.cashflow) store.cashflow = [];
+        if (!store.settings) store.settings = {};
+        saveData();
+        try { updateTopbarLogo(); } catch(e){}
+        try { renderDashboard(); } catch(e){}
+        try { renderHistory(); } catch(e){}
+        try { renderCashflow(); } catch(e){}
+        try { syncThemePicker(); } catch(e){}
+        input.value = '';
+        closeModal('settings-modal');
+        toast('✅ Data berhasil di-import!', 'success');
+      };
+    } catch(err) {
+      toast('❌ File tidak bisa dibaca: ' + err.message, 'error');
+      input.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ===================================================
+// SHARE INVOICE AS PDF
+// ===================================================
+function shareInvoicePDF() {
+  if (!currentDetailOrder) return;
+  const o = currentDetailOrder;
+  const d = { ...o, date: new Date(o.date).toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}), shop: o.shop || store.settings };
+
+  // Buat nama file otomatis: INVOICE - NAMA ORDER - INV-XXXX
+  const safeCustomer = (o.customer || 'Order').replace(/[^a-zA-Z0-9\s]/g, '').trim().toUpperCase();
+  const invNo = o.invNo || 'INV-0000';
+  const fileName = `INVOICE - ${safeCustomer} - ${invNo}.pdf`;
+
+  // Bangun HTML invoice
+  const invoiceHTML = currentDetailPrintType === 'a4' ? buildA4Invoice(d) : buildThermalInvoice(d);
+
+  const fullHTML = `<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>${fileName}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      ${getPrintCSS()}
+      body { margin: 0; padding: 12px; background: white; }
+    </style>
+    </head><body>${invoiceHTML}</body></html>`;
+
+  // Cek Web Share API + apakah bisa share files
+  if (navigator.share && navigator.canShare) {
+    // Coba share via Blob sebagai HTML (beberapa browser mendukung)
+    const blob = new Blob([fullHTML], { type: 'text/html' });
+    const file = new File([blob], fileName.replace('.pdf', '.html'), { type: 'text/html' });
+    if (navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: fileName })
+        .catch(err => { if (err.name !== 'AbortError') fallbackPrintToPDF(fullHTML, fileName); });
+      return;
+    }
+  }
+
+  // Fallback: buka di tab baru sehingga user bisa Save as PDF lewat print browser
+  fallbackPrintToPDF(fullHTML, fileName);
+}
+
+function fallbackPrintToPDF(fullHTML, fileName) {
+  // Buka jendela print dengan nama file sebagai judul
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.open();
+    win.document.write(fullHTML.replace('<title>', `<title>`).replace(/(<title>)[^<]*(<\/title>)/, `<title>${fileName}</title>`));
+    win.document.close();
+    win.addEventListener('load', () => {
+      setTimeout(() => {
+        win.focus();
+        win.print();
+      }, 600);
+    });
+    toast('💡 Pilih "Save as PDF" di dialog print!', 'default', 4000);
+  } else {
+    // Kalau popup diblokir, gunakan iframe seperti doPrint tapi dengan nama dokumen
+    document.title = fileName;
+    const existingFrame = document.getElementById('print-frame');
+    if (existingFrame) existingFrame.remove();
+    const iframe = document.createElement('iframe');
+    iframe.id = 'print-frame';
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:-9999;opacity:0;pointer-events:none';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(fullHTML);
+    doc.close();
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => { iframe.remove(); document.title = 'SablonPro — Kalkulator HPP & Invoice'; }, 1000);
+    }, 600);
+    toast('💡 Pilih "Save as PDF" di dialog print!', 'default', 4000);
+  }
+}
 
 // ===================================================
 // PWA SERVICE WORKER REGISTRATION
