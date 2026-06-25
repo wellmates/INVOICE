@@ -12,47 +12,6 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyB6ss1VkAFVWI5kK8iITszrjGajVwnv2UQ",
-    authDomain: "wellmates-32f0e.firebaseapp.com",
-    projectId: "wellmates-32f0e",
-    storageBucket: "wellmates-32f0e.firebasestorage.app",
-    messagingSenderId: "1088888130643",
-    appId: "1:1088888130643:web:5241f305b266ad7e178aa6",
-    measurementId: "G-12SVW276S2"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // Simpan ke Firestore
-  window.saveToCloud = async function(data) {
-    try {
-      await setDoc(doc(db, "sablonpro", "data"), data);
-    } catch(e) {
-      console.error("Cloud save error:", e);
-    }
-  };
-
-  // Load dari Firestore
-  window.loadFromCloud = async function() {
-    try {
-      const snap = await getDoc(doc(db, "sablonpro", "data"));
-      if (snap.exists()) return snap.data();
-    } catch(e) {
-      console.error("Cloud load error:", e);
-    }
-    return null;
-  };
-
-  window._firebaseReady = true;
-  window.dispatchEvent(new Event('firebaseReady'));
-</script>
 <style>
 /* ===================== TOKENS ===================== */
 :root {
@@ -1755,7 +1714,7 @@ function loadData() {
       if (!store.hutang)  store.hutang  = [];
       if (!store.piutang) store.piutang = [];
       if (!store.belanja) store.belanja = [];
-      if (!store.cashflow) store.cashflow = [];
+      // Bersihkan logoData dari order.shop lama (migrasi data lama)
       if (store.orders) {
         store.orders = store.orders.map(o => {
           if (!o.shop || !o.shop.logoData) return o;
@@ -1765,35 +1724,11 @@ function loadData() {
       }
     }
   } catch(e) { console.error('loadData error:', e); }
-
-  // Coba load dari cloud dan update jika ada data lebih baru
-  function tryCloudLoad() {
-    if (!window.loadFromCloud) return;
-    window.loadFromCloud().then(cloudData => {
-      if (!cloudData) return;
-      store = cloudData;
-      if (!store.hutang)  store.hutang  = [];
-      if (!store.piutang) store.piutang = [];
-      if (!store.belanja) store.belanja = [];
-      if (!store.cashflow) store.cashflow = [];
-      try { localStorage.setItem('sablonpro_v1', JSON.stringify(store)); } catch(e) {}
-      try { renderDashboard(); } catch(e) {}
-      try { renderHistory(); } catch(e) {}
-      try { renderCashflow(); } catch(e) {}
-      try { updateTopbarLogo(); } catch(e) {}
-      console.log('✅ Data loaded from cloud');
-    }).catch(e => console.error('Cloud load error:', e));
-  }
-
-  if (window._firebaseReady) {
-    tryCloudLoad();
-  } else {
-    window.addEventListener('firebaseReady', tryCloudLoad, { once: true });
-  }
 }
 function saveData() {
   try {
-    // Strip logoData dari setiap order.shop sebelum simpan
+    // Strip logoData dari setiap order.shop sebelum simpan ke localStorage
+    // Logo tetap ada di store.settings — tidak perlu duplikat di tiap order
     const toSave = {
       ...store,
       orders: (store.orders || []).map(o => {
@@ -1802,23 +1737,30 @@ function saveData() {
         return { ...o, shop: shopWithoutLogo };
       }),
     };
-    // Simpan ke localStorage (tetap sebagai backup offline)
-    try { localStorage.setItem('sablonpro_v1', JSON.stringify(toSave)); } catch(e) {
-      if (e.name === 'QuotaExceededError') {
-        try {
-          const { logoData, ...settingsNoLogo } = store.settings;
-          const toSave2 = { ...store, settings: settingsNoLogo, orders: toSave.orders };
-          localStorage.setItem('sablonpro_v1', JSON.stringify(toSave2));
-        } catch(e2) { console.error('saveData localStorage gagal:', e2); }
-      }
-    }
-    // Simpan ke Firestore (cloud) secara async
-    if (window.saveToCloud) {
-      window.saveToCloud(toSave).catch(e => console.error('Cloud sync error:', e));
-    }
+    localStorage.setItem('sablonpro_v1', JSON.stringify(toSave));
   } catch(e) {
-    console.error('saveData error:', e);
-    throw e;
+    if (e.name === 'QuotaExceededError' || (e.message && e.message.toLowerCase().includes('quota'))) {
+      // Coba sekali lagi tanpa logo di settings juga
+      try {
+        const { logoData, ...settingsNoLogo } = store.settings;
+        const toSave2 = {
+          ...store,
+          settings: settingsNoLogo,
+          orders: (store.orders || []).map(o => {
+            if (!o.shop) return o;
+            const { logoData: _l, ...shopWithoutLogo } = o.shop;
+            return { ...o, shop: shopWithoutLogo };
+          }),
+        };
+        localStorage.setItem('sablonpro_v1', JSON.stringify(toSave2));
+        console.warn('Logo dihapus dari penyimpanan karena kapasitas penuh.');
+      } catch(e2) {
+        console.error('saveData gagal total:', e2);
+        throw e2; // biarkan caller tangkap
+      }
+    } else {
+      throw e;
+    }
   }
 }
 
@@ -3132,12 +3074,50 @@ function saveEditOrder() {
     if (breakdown.sablon > 0) store.cashflow.push({ id: Date.now()+3, type:'out', desc:`HPP Sablon/Bordir — ${o.invNo} (${customer})`, amount: breakdown.sablon * totalQty, date: tgl, category:'Biaya Produksi' });
   }
 
-  // Update pemasukan cashflow jika revenue berubah (update amount di entry yang ada)
-  store.cashflow.forEach(c => {
-    if (c.type==='in' && c.desc.includes(o.invNo)) {
-      if (payStatus==='Lunas') c.amount = totalRevenue;
+  // Update pemasukan cashflow jika revenue / DP berubah
+  if (payStatus === 'Lunas') {
+    // Kalau Lunas: hapus semua entry DP lama, ganti dengan 1 entry total
+    const existingIn = store.cashflow.filter(c => c.type==='in' && c.desc.includes(o.invNo));
+    if (existingIn.length > 0) {
+      // Update entry pertama jadi total, hapus sisanya
+      const firstId = existingIn[0].id;
+      store.cashflow = store.cashflow.filter(c => !(c.type==='in' && c.desc.includes(o.invNo) && c.id !== firstId));
+      const entry = store.cashflow.find(c => c.id === firstId);
+      if (entry) { entry.amount = totalRevenue; entry.desc = `Lunas — ${o.invNo} (${customer})`; }
+    } else {
+      // Belum ada entry cashflow sama sekali, buat baru
+      const tgl = o.date || new Date().toISOString().split('T')[0];
+      store.cashflow.push({ id: Date.now()+1, type:'in', desc:`Lunas — ${o.invNo} (${customer})`, amount: totalRevenue, date: tgl, category:'Penjualan' });
     }
-  });
+  } else if (payStatus === 'DP') {
+    // Kalau DP: sync tiap entry cashflow dengan dpHistory yang sudah diupdate
+    // Update/hapus entry lama yang match invNo, lalu rebuild dari dpHistory baru
+    const dpHistory = o.dpHistory || [];
+    const existingInEntries = store.cashflow.filter(c => c.type==='in' && c.desc.includes(o.invNo));
+
+    // Kalau jumlah entry sama dengan dpHistory, update satu-satu by index
+    if (existingInEntries.length === dpHistory.length && dpHistory.length > 0) {
+      dpHistory.forEach((dp, i) => {
+        const cfEntry = existingInEntries[i];
+        if (cfEntry) {
+          cfEntry.amount = dp.amount;
+          cfEntry.desc = `${dp.note} — ${o.invNo} (${customer})`;
+        }
+      });
+    } else {
+      // Jumlah entry beda (misal baru pertama kali simpan dengan DP):
+      // Hapus semua entry lama, rebuild dari dpHistory
+      store.cashflow = store.cashflow.filter(c => !(c.type==='in' && c.desc.includes(o.invNo)));
+      const tgl = o.date || new Date().toISOString().split('T')[0];
+      dpHistory.forEach((dp, i) => {
+        store.cashflow.push({ id: Date.now()+10+i, type:'in', desc:`${dp.note} — ${o.invNo} (${customer})`, amount: dp.amount, date: dp.date || tgl, category:'Penjualan' });
+      });
+      // Kalau belum ada dpHistory tapi DP diisi manual di field edit-dp
+      if (dpHistory.length === 0 && dp > 0) {
+        store.cashflow.push({ id: Date.now()+1, type:'in', desc:`DP — ${o.invNo} (${customer})`, amount: dp, date: tgl, category:'Penjualan' });
+      }
+    }
+  }
 
   const idx = store.orders.findIndex(x=>x.id===o.id);
   if (idx < 0) return;
