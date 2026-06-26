@@ -2691,7 +2691,7 @@ function saveOrder() {
     totalQty: d.totalQty,
     totalRevenue: d.totalRevenue,
     dp: d.dp,
-    dpHistory: d.payStatus === 'DP' && d.dp > 0 ? [{ amount: d.dp, note: 'DP ke-1', date: new Date().toISOString().split('T')[0] }] : [],
+    dpHistory: d.payStatus === 'DP' && d.dp > 0 ? [{ amount: d.dp, note: 'DP ke-1', date: new Date().toISOString().split('T')[0], cfId: Date.now()+2 }] : [],
     payStatus: d.payStatus,
     sisa: d.sisa,
     deadline: d.deadline,
@@ -2710,7 +2710,8 @@ function saveOrder() {
   if (d.payStatus === 'Lunas') {
     store.cashflow.push({ id: Date.now()+1, type: 'in', desc: `Lunas — ${d.invNo} (${d.customer})`, amount: d.totalRevenue, date: tglOrder, category: 'Penjualan' });
   } else if (d.payStatus === 'DP' && d.dp > 0) {
-    store.cashflow.push({ id: Date.now()+1, type: 'in', desc: `DP ke-1 — ${d.invNo} (${d.customer})`, amount: d.dp, date: tglOrder, category: 'Penjualan' });
+    const cfId = Date.now()+2;
+    store.cashflow.push({ id: cfId, type: 'in', desc: `DP ke-1 — ${d.invNo} (${d.customer})`, amount: d.dp, date: tglOrder, category: 'Penjualan' });
   }
 
   // Cashflow: pengeluaran HPP otomatis (bahan + sablon)
@@ -2929,8 +2930,6 @@ function saveEditDpItem(i) {
   if (!o || !o.dpHistory) return;
   const newNote   = document.getElementById(`edp-note-${i}`).value;
   const newAmount = parseFloat(document.getElementById(`edp-amount-${i}`).value) || 0;
-  const oldAmount = o.dpHistory[i].amount;
-  const oldNote   = o.dpHistory[i].note;
 
   // Update dpHistory entry
   o.dpHistory[i].note   = newNote;
@@ -2943,11 +2942,11 @@ function saveEditDpItem(i) {
   if (o.sisa <= 0) { o.sisa = 0; o.payStatus = 'Lunas'; }
   else o.payStatus = 'DP';
 
-  // Update corresponding cashflow entry — pakai oldNote & oldAmount buat match yang tepat
-  const cfIdx = store.cashflow.findIndex(c =>
-    c.type === 'in' && c.desc.includes(o.invNo) &&
-    (c.desc.includes(oldNote || '') || c.amount === oldAmount)
-  );
+  // FIX BUG 1 & 2: Pakai cfId (ID cashflow tersimpan di dpHistory) buat match yang pasti tepat
+  const cfId = o.dpHistory[i].cfId;
+  const cfIdx = cfId != null
+    ? store.cashflow.findIndex(c => c.id === cfId)
+    : store.cashflow.findIndex(c => c.type === 'in' && c.desc.includes(o.invNo));
   if (cfIdx >= 0) {
     store.cashflow[cfIdx].amount = newAmount;
     store.cashflow[cfIdx].desc = `${newNote} — ${o.invNo} (${o.customer})`;
@@ -2970,10 +2969,18 @@ function deleteEditDpItem(i) {
   if (!o || !o.dpHistory) return;
   const removed = o.dpHistory[i];
 
-  // Remove matching cashflow entry
-  store.cashflow = store.cashflow.filter(c =>
-    !(c.type === 'in' && c.desc.includes(o.invNo) && c.amount === removed.amount && c.desc.includes(removed.note || ''))
-  );
+  // FIX BUG 1: Hapus cashflow pakai cfId, bukan cocokkan amount (bisa salah hapus kalau nominal sama)
+  const cfId = removed.cfId;
+  if (cfId != null) {
+    store.cashflow = store.cashflow.filter(c => c.id !== cfId);
+  } else {
+    // Fallback untuk data lama yang belum punya cfId: hapus satu entry yang paling cocok
+    const cfIdx = store.cashflow.findIndex(c =>
+      c.type === 'in' && c.desc.includes(o.invNo) &&
+      c.desc.includes(removed.note || '') && c.amount === removed.amount
+    );
+    if (cfIdx >= 0) store.cashflow.splice(cfIdx, 1);
+  }
 
   o.dpHistory.splice(i, 1);
   const totalPaid = o.dpHistory.reduce((a,x) => a+x.amount, 0);
@@ -2995,22 +3002,40 @@ function deleteEditDpItem(i) {
 }
 
 function submitAddDp() {
-  const amount = parseFloat(document.getElementById('add-dp-amount').value);
+  let amount = parseFloat(document.getElementById('add-dp-amount').value);
   const note = document.getElementById('add-dp-note').value || 'DP';
   if (!amount || amount <= 0) { toast('⚠️ Isi jumlah pembayaran!', 'warn'); return; }
   const o = currentDetailOrder;
   if (!o) return;
   if (!o.dpHistory) o.dpHistory = [];
+
+  // FIX BUG 4: Clamp DP agar total tidak melebihi totalRevenue
+  const totalPaidSoFar = o.dpHistory.reduce((a,x) => a+x.amount, 0);
+  const maxAllowed = o.totalRevenue - totalPaidSoFar;
+  if (amount > maxAllowed) {
+    amount = maxAllowed;
+    toast(`⚠️ DP dikurangi ke ${fmtRp(amount)} agar tidak melebihi total order`, 'warn', 4000);
+  }
+  if (amount <= 0) { toast('⚠️ Order sudah lunas, tidak bisa tambah DP lagi!', 'warn'); return; }
+
   const tgl = new Date().toISOString().split('T')[0];
-  o.dpHistory.push({ amount, note, date: tgl });
+  const cfId = Date.now();
+
+  // Simpan cfId di dpHistory agar cashflow bisa di-match dengan pasti (fix bug 1 & 2)
+  o.dpHistory.push({ amount, note, date: tgl, cfId });
+
   // Update dp total & sisa
   const totalPaid = o.dpHistory.reduce((a,x) => a+x.amount, 0);
   o.dp = totalPaid;
   o.sisa = o.totalRevenue - totalPaid;
   if (o.sisa <= 0) { o.sisa = 0; o.payStatus = 'Lunas'; }
   else o.payStatus = 'DP';
-  // Pemasukan masuk ke riwayat transaksi
-  store.cashflow.push({ id: Date.now(), type: 'in', desc: `${note} — ${o.invNo} (${o.customer})`, amount, date: tgl, category: 'Penjualan' });
+
+  // Pemasukan masuk ke riwayat transaksi — pakai cfId yang sama
+  store.cashflow.push({ id: cfId, type: 'in', desc: `${note} — ${o.invNo} (${o.customer})`, amount, date: tgl, category: 'Penjualan' });
+
+  const idx = store.orders.findIndex(x => x.id === o.id);
+  if (idx >= 0) store.orders[idx] = o;
   saveData();
   currentDetailOrder = o;
   document.getElementById('add-dp-section').style.display = 'none';
@@ -3134,28 +3159,31 @@ function saveEditOrder() {
 
   // Update pemasukan cashflow jika DP atau status berubah
   if (payStatus === 'Lunas') {
-    // Kalau jadi Lunas: update semua entry pemasukan invoice ini jadi total revenue
-    // Hapus semua entry pemasukan lama, buat satu entry baru "Lunas"
-    const hadDpEntries = store.cashflow.some(c => c.type==='in' && c.desc.includes(o.invNo));
-    if (hadDpEntries) {
-      store.cashflow = store.cashflow.filter(c => !(c.type==='in' && c.desc.includes(o.invNo)));
-      store.cashflow.push({ id: Date.now()+1, type:'in', desc:`Lunas — ${o.invNo} (${customer})`, amount: totalRevenue, date: o.date || new Date().toISOString().split('T')[0], category:'Penjualan' });
-    }
+    // Hapus semua entry pemasukan lama untuk invoice ini
+    store.cashflow = store.cashflow.filter(c => !(c.type==='in' && c.desc.includes(o.invNo)));
+    // Selalu buat entry Lunas baru (termasuk kasus dari Belum Bayar → Lunas)
+    store.cashflow.push({ id: Date.now()+1, type:'in', desc:`Lunas — ${o.invNo} (${customer})`, amount: totalRevenue, date: o.date || new Date().toISOString().split('T')[0], category:'Penjualan' });
   } else if (payStatus === 'DP') {
-    // Cari semua entry DP untuk invoice ini (biasanya hanya satu dari simpan awal)
-    const dpEntries = store.cashflow.filter(c => c.type==='in' && c.desc.includes(o.invNo));
-    if (dpEntries.length === 1) {
-      // Satu entry DP — update nominalnya saja
-      dpEntries[0].amount = dp;
-    } else if (dpEntries.length > 1) {
-      // Ada history DP bertahap — kalau total berbeda, update entry terakhir agar totalnya cocok
-      const sumExceptLast = dpEntries.slice(0,-1).reduce((a,c)=>a+c.amount, 0);
-      const lastEntry = dpEntries[dpEntries.length - 1];
+    const allInvoiceEntries = store.cashflow.filter(c => c.type==='in' && c.desc.includes(o.invNo));
+    const lunasEntry = allInvoiceEntries.find(c => c.desc.startsWith('Lunas'));
+
+    if (lunasEntry) {
+      // Sebelumnya Lunas, sekarang diubah ke DP — hapus entry Lunas, buat entry DP baru
+      store.cashflow = store.cashflow.filter(c => !(c.type==='in' && c.desc.includes(o.invNo)));
+      if (dp > 0) {
+        store.cashflow.push({ id: Date.now()+1, type:'in', desc:`DP ke-1 — ${o.invNo} (${customer})`, amount: dp, date: o.date || new Date().toISOString().split('T')[0], category:'Penjualan' });
+      }
+    } else if (allInvoiceEntries.length === 1) {
+      // Satu entry DP biasa — update nominalnya
+      allInvoiceEntries[0].amount = dp;
+    } else if (allInvoiceEntries.length > 1) {
+      // DP bertahap — sesuaikan entry terakhir agar totalnya match
+      const sumExceptLast = allInvoiceEntries.slice(0,-1).reduce((a,c)=>a+c.amount, 0);
+      const lastEntry = allInvoiceEntries[allInvoiceEntries.length - 1];
       const diff = dp - sumExceptLast;
       if (diff > 0) lastEntry.amount = diff;
-    }
-    // Kalau belum ada entry sama sekali, tambahkan
-    if (dpEntries.length === 0 && dp > 0) {
+    } else if (dp > 0) {
+      // Belum ada entry sama sekali — buat baru
       store.cashflow.push({ id: Date.now()+1, type:'in', desc:`DP ke-1 — ${o.invNo} (${customer})`, amount: dp, date: o.date || new Date().toISOString().split('T')[0], category:'Penjualan' });
     }
   }
