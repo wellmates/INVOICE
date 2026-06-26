@@ -4231,19 +4231,28 @@ function shareInvoicePDF() {
         const pdfH = (canvas.height * pdfW) / canvas.width;
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
 
-        // Coba share sebagai file PDF
-        if (navigator.share && navigator.canShare) {
-          pdf.getBlob(blob => {
-            const file = new File([blob], fileName, { type: 'application/pdf' });
-            if (navigator.canShare({ files: [file] })) {
-              navigator.share({ files: [file], title: fileName })
-                .catch(err => { if (err.name !== 'AbortError') pdf.save(fileName); });
-              return;
-            }
-            pdf.save(fileName);
-          });
+        // Coba share sebagai file PDF via Web Share API
+        const blob = pdf.output('blob');
+        const file = new File([blob], fileName, { type: 'application/pdf' });
+
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: fileName, text: fileName })
+            .catch(err => {
+              if (err.name !== 'AbortError') {
+                // Fallback download kalau share gagal
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fileName; a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                toast('✅ PDF diunduh!', 'success');
+              }
+            });
         } else {
-          pdf.save(fileName);
+          // Browser tidak support share file — langsung download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = fileName; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
           toast('✅ PDF berhasil diunduh!', 'success');
         }
       }).catch(err => {
