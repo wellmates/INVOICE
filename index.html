@@ -3192,6 +3192,30 @@ function saveEditOrder() {
   if (idx < 0) return;
   const newHppPerPcs = baseHpp > 0 ? baseHpp : (totalQty > 0 ? totalRevenue / totalQty * 0.5 : 0);
   const newTotalHpp  = baseHpp > 0 ? baseHpp * totalQty : 0;
+
+  // Sync dpHistory agar invoice display ikut update
+  let updatedDpHistory = o.dpHistory ? [...o.dpHistory] : [];
+  if (payStatus === 'Lunas') {
+    // Lunas: bersihkan dpHistory, nanti invoice tampil "Lunas"
+    updatedDpHistory = [];
+  } else if (payStatus === 'DP') {
+    if (updatedDpHistory.length === 0 && dp > 0) {
+      // Belum ada history — buat entry pertama
+      updatedDpHistory = [{ amount: dp, note: 'DP ke-1', date: o.date || new Date().toISOString().split('T')[0], cfId: Date.now()+10 }];
+    } else if (updatedDpHistory.length === 1) {
+      // Satu entry — update nominalnya
+      updatedDpHistory[0].amount = dp;
+    } else if (updatedDpHistory.length > 1) {
+      // DP bertahap — sesuaikan entry terakhir agar total match
+      const sumExceptLast = updatedDpHistory.slice(0,-1).reduce((a,x)=>a+x.amount, 0);
+      const diff = dp - sumExceptLast;
+      updatedDpHistory[updatedDpHistory.length-1].amount = diff > 0 ? diff : 0;
+    }
+  } else {
+    // Belum Bayar
+    updatedDpHistory = [];
+  }
+
   store.orders[idx] = {
     ...o,
     customer,
@@ -3207,8 +3231,8 @@ function saveEditOrder() {
     payStatus,
     dp,
     sisa,
+    dpHistory: updatedDpHistory,
     notes: document.getElementById('edit-notes').value,
-    baseHpp,
     hpp: { hppPerPcs: newHppPerPcs, totalHpp: newTotalHpp, breakdown: { bahan: Math.round(baseHpp*0.55), sablon: Math.round(baseHpp*0.45), afdruk: 0 } },
   };
   currentDetailOrder = store.orders[idx];
