@@ -1759,11 +1759,15 @@ const SIZE_BASE_ANAK = [
   { code: 'A14', label: '14', tier: 'B' },
 ];
 
-// Tambahan harga untuk varian panjang
+// Tambahan harga default untuk varian panjang (dewasa)
 const PANJANG_ADD = 10000;
 const PANJANG_RIB_ADD = 15000;
 
-// Generate SIZES: Normal + Panjang + Panjang+Rib untuk tiap ukuran dewasa, + size anak (2 tier harga)
+// Tambahan harga default untuk varian panjang size anak (bisa diedit manual di form)
+const KIDS_PANJANG_ADD_DEFAULT = 10000;
+const KIDS_RIB_ADD_DEFAULT = 15000;
+
+// Generate SIZES: Normal + Panjang + Panjang+Rib untuk tiap ukuran dewasa, + size anak (2 tier harga, juga ada Panjang & Pjg+Rib)
 function buildSizes() {
   const result = [];
   SIZE_BASE.forEach(s => {
@@ -1775,7 +1779,9 @@ function buildSizes() {
   const discB = (store && store.settings && store.settings.kidsDiscountB != null) ? store.settings.kidsDiscountB : 10000;
   SIZE_BASE_ANAK.forEach(s => {
     const disc = s.tier === 'A' ? discA : discB;
-    result.push({ code: s.code, label: s.label, add: -disc, group: 'Anak', tier: s.tier, baseCode: s.code, category: 'anak' });
+    result.push({ code: s.code,       label: s.label,             add: -disc,                                  group: 'Normal',      tier: s.tier, baseCode: s.code, category: 'anak' });
+    result.push({ code: s.code+'_P',  label: s.label+' PJG',       add: -disc + KIDS_PANJANG_ADD_DEFAULT,       group: 'Panjang',     tier: s.tier, baseCode: s.code, category: 'anak' });
+    result.push({ code: s.code+'_PR', label: s.label+' PJG+RIB',   add: -disc + KIDS_RIB_ADD_DEFAULT,           group: 'Panjang+Rib', tier: s.tier, baseCode: s.code, category: 'anak' });
   });
   return result;
 }
@@ -2127,7 +2133,7 @@ function renderSizeGrid() {
   const discA = (store.settings && store.settings.kidsDiscountA != null) ? store.settings.kidsDiscountA : 20000;
   const discB = (store.settings && store.settings.kidsDiscountB != null) ? store.settings.kidsDiscountB : 10000;
 
-  function kidsTierBlock(tierLabel, inputId, defaultDisc, sizesArr) {
+  function kidsTierBlock(tierLabel, tierCode, defaultDisc, defaultPanjang, defaultRib, sizesArr) {
     const rows = sizesArr.map(s => `<tr>
       <td>
         <div class="size-row-label">
@@ -2135,14 +2141,34 @@ function renderSizeGrid() {
         </div>
       </td>
       <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}" oninput="recalculate()"></td>
+      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_P" oninput="recalculate()"></td>
+      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_PR" oninput="recalculate()"></td>
     </tr>`).join('');
     return `
-      <div style="display:flex;align-items:center;gap:8px;margin:10px 0 6px">
-        <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">${tierLabel}</span>
-        <span style="font-size:11px;color:var(--text-muted)">selisih (Rp lebih murah):</span>
-        <input type="number" inputmode="numeric" id="${inputId}" value="${defaultDisc}" oninput="recalculate()" style="width:90px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--brand);font-weight:700;font-size:12px">
+      <div style="margin:10px 0 6px">
+        <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:5px">${tierLabel}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div style="flex:1;min-width:88px">
+            <div style="font-size:10px;color:var(--text-muted)">Selisih dasar</div>
+            <input type="number" inputmode="numeric" id="anak-diff-${tierCode}" value="${defaultDisc}" oninput="recalculate()" style="width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--brand);font-weight:700;font-size:12px">
+          </div>
+          <div style="flex:1;min-width:88px">
+            <div style="font-size:10px;color:var(--text-muted)">+ Panjang</div>
+            <input type="number" inputmode="numeric" id="anak-panjang-${tierCode}" value="${defaultPanjang}" oninput="recalculate()" style="width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
+          </div>
+          <div style="flex:1;min-width:88px">
+            <div style="font-size:10px;color:var(--text-muted)">+ Pjg+Rib</div>
+            <input type="number" inputmode="numeric" id="anak-rib-${tierCode}" value="${defaultRib}" oninput="recalculate()" style="width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
+          </div>
+        </div>
       </div>
-      <table class="size-table-wrap"><tbody>${rows}</tbody></table>`;
+      <table class="size-table-wrap">
+        <thead><tr>
+          <th style="text-align:left;padding-left:0">Ukuran</th>
+          <th>Pendek</th><th>Panjang</th><th>Pjg+Rib</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
   }
 
   const kidsGroupA = SIZE_BASE_ANAK.filter(s => s.tier === 'A');
@@ -2151,22 +2177,36 @@ function renderSizeGrid() {
   container.innerHTML = `
     <table class="size-table-wrap">${colHeaders}<tbody>${rows}</tbody></table>
     <div class="size-group-title" style="margin-top:14px">👶 Ukuran Anak</div>
-    ${kidsTierBlock('Size 2 – 8 Thn', 'anak-diff-A', discA, kidsGroupA)}
-    ${kidsTierBlock('Size 10 – 14 Thn', 'anak-diff-B', discB, kidsGroupB)}
+    ${kidsTierBlock('Size 2 – 8 Thn', 'A', discA, KIDS_PANJANG_ADD_DEFAULT, KIDS_RIB_ADD_DEFAULT, kidsGroupA)}
+    ${kidsTierBlock('Size 10 – 14 Thn', 'B', discB, KIDS_PANJANG_ADD_DEFAULT, KIDS_RIB_ADD_DEFAULT, kidsGroupB)}
   `;
 }
 
 function getSizeData() {
   const diffA = parseFloat(document.getElementById('anak-diff-A')?.value);
   const diffB = parseFloat(document.getElementById('anak-diff-B')?.value);
+  const panjangA = parseFloat(document.getElementById('anak-panjang-A')?.value);
+  const panjangB = parseFloat(document.getElementById('anak-panjang-B')?.value);
+  const ribA = parseFloat(document.getElementById('anak-rib-A')?.value);
+  const ribB = parseFloat(document.getElementById('anak-rib-B')?.value);
   return SIZES.map(s => {
     const qty = parseInt(document.getElementById('qty-' + s.code)?.value || '0') || 0;
     let add = s.add;
+    let extra = {};
     if (s.category === 'anak') {
-      if (s.tier === 'A' && !isNaN(diffA)) add = -diffA;
-      if (s.tier === 'B' && !isNaN(diffB)) add = -diffB;
+      const diff = s.tier === 'A' ? diffA : diffB;
+      const panjang = s.tier === 'A' ? panjangA : panjangB;
+      const rib = s.tier === 'A' ? ribA : ribB;
+      const resolvedDiff = !isNaN(diff) ? diff : -add;
+      const resolvedPanjang = !isNaN(panjang) ? panjang : KIDS_PANJANG_ADD_DEFAULT;
+      const resolvedRib = !isNaN(rib) ? rib : KIDS_RIB_ADD_DEFAULT;
+      const baseAdd = -resolvedDiff;
+      if (s.group === 'Normal') add = baseAdd;
+      else if (s.group === 'Panjang') add = baseAdd + resolvedPanjang;
+      else if (s.group === 'Panjang+Rib') add = baseAdd + resolvedRib;
+      extra = { tierDiff: resolvedDiff, tierPanjangAdd: resolvedPanjang, tierRibAdd: resolvedRib };
     }
-    return { ...s, add, qty };
+    return { ...s, add, qty, ...extra };
   }).filter(s => s.qty > 0);
 }
 
@@ -3175,7 +3215,14 @@ function renderEditSizeGrid(o) {
   function findTierDiscount(tierCodes, fallback) {
     for (const code of tierCodes) {
       const entry = o.sizes.find(x => x.code === code);
-      if (entry) return -(entry.customAdd ?? entry.add ?? -fallback);
+      if (entry) return entry.tierDiff ?? -(entry.customAdd ?? entry.add ?? -fallback);
+    }
+    return fallback;
+  }
+  function findTierAddon(tierCodes, field, fallback) {
+    for (const code of tierCodes) {
+      const entry = o.sizes.find(x => x.code === code);
+      if (entry && entry[field] != null) return entry[field];
     }
     return fallback;
   }
@@ -3183,17 +3230,44 @@ function renderEditSizeGrid(o) {
   const discB = (store.settings && store.settings.kidsDiscountB != null) ? store.settings.kidsDiscountB : 10000;
   const kidsGroupA = SIZE_BASE_ANAK.filter(s => s.tier === 'A');
   const kidsGroupB = SIZE_BASE_ANAK.filter(s => s.tier === 'B');
-  const eDiscA = findTierDiscount(kidsGroupA.map(s=>s.code), discA);
-  const eDiscB = findTierDiscount(kidsGroupB.map(s=>s.code), discB);
+  const allACodes = kidsGroupA.flatMap(s => [s.code, s.code+'_P', s.code+'_PR']);
+  const allBCodes = kidsGroupB.flatMap(s => [s.code, s.code+'_P', s.code+'_PR']);
+  const eDiscA = findTierDiscount(allACodes, discA);
+  const eDiscB = findTierDiscount(allBCodes, discB);
+  const ePanjangA = findTierAddon(allACodes, 'tierPanjangAdd', KIDS_PANJANG_ADD_DEFAULT);
+  const ePanjangB = findTierAddon(allBCodes, 'tierPanjangAdd', KIDS_PANJANG_ADD_DEFAULT);
+  const eRibA = findTierAddon(allACodes, 'tierRibAdd', KIDS_RIB_ADD_DEFAULT);
+  const eRibB = findTierAddon(allBCodes, 'tierRibAdd', KIDS_RIB_ADD_DEFAULT);
 
   function kidsTierRows(sizesArr) {
     return sizesArr.map(s => {
-      const qty = (o.sizes.find(x=>x.code===s.code)?.qty)||0;
+      const qN  = (o.sizes.find(x=>x.code===s.code)?.qty)||0;
+      const qP  = (o.sizes.find(x=>x.code===s.code+'_P')?.qty)||0;
+      const qPR = (o.sizes.find(x=>x.code===s.code+'_PR')?.qty)||0;
       return `<tr>
         <td style="font-size:12px;font-weight:700;padding:3px 0;width:36px">${s.label}</td>
-        <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}" value="${qty||''}" oninput="recalcEditSizes()"></td>
+        <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}" value="${qN||''}" oninput="recalcEditSizes()"></td>
+        <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}_P" value="${qP||''}" oninput="recalcEditSizes()"></td>
+        <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}_PR" value="${qPR||''}" oninput="recalcEditSizes()"></td>
       </tr>`;
     }).join('');
+  }
+
+  function kidsTierControls(tierCode, defaultDisc, defaultPanjang, defaultRib) {
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 6px">
+      <div style="flex:1;min-width:88px">
+        <div style="font-size:10px;color:var(--text-muted)">Selisih dasar</div>
+        <input type="number" inputmode="numeric" id="eanak-diff-${tierCode}" value="${defaultDisc}" oninput="recalcEditSizes()" style="width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
+      </div>
+      <div style="flex:1;min-width:88px">
+        <div style="font-size:10px;color:var(--text-muted)">+ Panjang</div>
+        <input type="number" inputmode="numeric" id="eanak-panjang-${tierCode}" value="${defaultPanjang}" oninput="recalcEditSizes()" style="width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
+      </div>
+      <div style="flex:1;min-width:88px">
+        <div style="font-size:10px;color:var(--text-muted)">+ Pjg+Rib</div>
+        <input type="number" inputmode="numeric" id="eanak-rib-${tierCode}" value="${defaultRib}" oninput="recalcEditSizes()" style="width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
+      </div>
+    </div>`;
   }
 
   wrap.innerHTML = `<table class="size-table-wrap">
@@ -3203,30 +3277,41 @@ function renderEditSizeGrid(o) {
     </tr></thead><tbody>${rows}</tbody></table>
     <div style="font-size:10px;color:var(--text-muted);margin-top:4px">💡 +Harga = selisih harga ukuran ini vs harga dasar</div>
     <div class="size-group-title" style="margin-top:14px">👶 Ukuran Anak</div>
-    <div style="display:flex;align-items:center;gap:8px;margin:8px 0 6px">
-      <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Size 2–8 Thn</span>
-      <span style="font-size:11px;color:var(--text-muted)">selisih:</span>
-      <input type="number" inputmode="numeric" id="eanak-diff-A" value="${eDiscA}" oninput="recalcEditSizes()" style="width:90px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
-    </div>
-    <table class="size-table-wrap"><tbody>${kidsTierRows(kidsGroupA)}</tbody></table>
-    <div style="display:flex;align-items:center;gap:8px;margin:10px 0 6px">
-      <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Size 10–14 Thn</span>
-      <span style="font-size:11px;color:var(--text-muted)">selisih:</span>
-      <input type="number" inputmode="numeric" id="eanak-diff-B" value="${eDiscB}" oninput="recalcEditSizes()" style="width:90px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
-    </div>
-    <table class="size-table-wrap"><tbody>${kidsTierRows(kidsGroupB)}</tbody></table>`;
+    <div style="font-size:12px;font-weight:700;color:var(--text-secondary)">Size 2–8 Thn</div>
+    ${kidsTierControls('A', eDiscA, ePanjangA, eRibA)}
+    <table class="size-table-wrap">
+      <thead><tr><th style="text-align:left;padding-left:0">Ukur</th><th>Pendek</th><th>Panjang</th><th>Pjg+Rib</th></tr></thead>
+      <tbody>${kidsTierRows(kidsGroupA)}</tbody>
+    </table>
+    <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-top:12px">Size 10–14 Thn</div>
+    ${kidsTierControls('B', eDiscB, ePanjangB, eRibB)}
+    <table class="size-table-wrap">
+      <thead><tr><th style="text-align:left;padding-left:0">Ukur</th><th>Pendek</th><th>Panjang</th><th>Pjg+Rib</th></tr></thead>
+      <tbody>${kidsTierRows(kidsGroupB)}</tbody>
+    </table>`;
 }
 
 function getEditSizeData() {
   const eDiffA = parseFloat(document.getElementById('eanak-diff-A')?.value);
   const eDiffB = parseFloat(document.getElementById('eanak-diff-B')?.value);
+  const ePanjangA = parseFloat(document.getElementById('eanak-panjang-A')?.value);
+  const ePanjangB = parseFloat(document.getElementById('eanak-panjang-B')?.value);
+  const eRibA = parseFloat(document.getElementById('eanak-rib-A')?.value);
+  const eRibB = parseFloat(document.getElementById('eanak-rib-B')?.value);
   return SIZES.map(s => {
     const qty = parseInt(document.getElementById('eqty-' + s.code)?.value || '0') || 0;
     if (s.category === 'anak') {
-      let add = s.add;
-      if (s.tier === 'A' && !isNaN(eDiffA)) add = -eDiffA;
-      if (s.tier === 'B' && !isNaN(eDiffB)) add = -eDiffB;
-      return { ...s, qty, add, customAdd: add };
+      const diff = s.tier === 'A' ? eDiffA : eDiffB;
+      const panjang = s.tier === 'A' ? ePanjangA : ePanjangB;
+      const rib = s.tier === 'A' ? eRibA : eRibB;
+      const resolvedDiff = !isNaN(diff) ? diff : -s.add;
+      const resolvedPanjang = !isNaN(panjang) ? panjang : KIDS_PANJANG_ADD_DEFAULT;
+      const resolvedRib = !isNaN(rib) ? rib : KIDS_RIB_ADD_DEFAULT;
+      const baseAdd = -resolvedDiff;
+      let add = baseAdd;
+      if (s.group === 'Panjang') add = baseAdd + resolvedPanjang;
+      else if (s.group === 'Panjang+Rib') add = baseAdd + resolvedRib;
+      return { ...s, qty, add, tierDiff: resolvedDiff, tierPanjangAdd: resolvedPanjang, tierRibAdd: resolvedRib };
     }
     // Read custom add-on from SIZE_BASE row (not _P or _PR variants)
     const baseCode = s.baseCode || s.code;
