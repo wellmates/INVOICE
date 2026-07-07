@@ -866,9 +866,19 @@ body {
       <div class="section-header">
         <div class="section-title">Dashboard</div>
         <div class="tabs" style="margin-bottom:0;width:auto">
-          <button class="tab active" onclick="setDashTab('week',this)">Minggu</button>
-          <button class="tab" onclick="setDashTab('month',this)">Bulan</button>
+          <button class="tab active" onclick="setDashTab('year',this)">Bulan</button>
+          <button class="tab" onclick="setDashTab('month',this)">Minggu</button>
+          <button class="tab" onclick="setDashTab('week',this)">Hari</button>
         </div>
+      </div>
+
+      <div id="dash-year-picker" style="margin-bottom:10px">
+        <select id="dash-year-select" onchange="onDashYearChange()" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-weight:600;font-family:'Inter',sans-serif"></select>
+      </div>
+
+      <div id="dash-month-picker" style="display:none;margin-bottom:10px;gap:8px">
+        <select id="dash-month-select" onchange="onDashMonthChange()" style="flex:1;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-weight:600;font-family:'Inter',sans-serif"></select>
+        <select id="dash-month-year-select" onchange="onDashMonthChange()" style="width:110px;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-weight:600;font-family:'Inter',sans-serif"></select>
       </div>
 
       <div class="stats-grid" id="stats-grid"></div>
@@ -1230,6 +1240,20 @@ body {
       <div class="form-group form-full">
         <label>Nama Pemilik Rekening</label>
         <input type="text" id="s-bank-owner" placeholder="Nama sesuai buku tabungan">
+      </div>
+      <div class="form-group form-full">
+        <label>👶 Default Selisih Harga Size Anak (bisa diubah lagi per-order)</label>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1">
+            <input type="number" inputmode="numeric" id="s-kids-discount-a" placeholder="20000">
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Size 2-8 thn</div>
+          </div>
+          <div style="flex:1">
+            <input type="number" inputmode="numeric" id="s-kids-discount-b" placeholder="10000">
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Size 10-14 thn</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Ini cuma nilai default. Pas bikin/edit order, selisihnya tetap bisa diubah manual di form order.</div>
       </div>
     </div>
     <!-- THEME PICKER -->
@@ -1700,7 +1724,7 @@ body {
 // DATA STORE
 // ===================================================
 let store = {
-  settings: { shopname: 'SablonPro', field: 'Sablon & Konveksi', phone: '', address: '', email: '', tagline: 'Kualitas Terbaik, Pengiriman Tepat Waktu', bankName: '', bankNo: '', bankOwner: '', logoData: '' },
+  settings: { shopname: 'SablonPro', field: 'Sablon & Konveksi', phone: '', address: '', email: '', tagline: 'Kualitas Terbaik, Pengiriman Tepat Waktu', bankName: '', bankNo: '', bankOwner: '', logoData: '', kidsDiscountA: 20000, kidsDiscountB: 10000 },
   orders: [],
   cashflow: [],
   hutang: [],
@@ -1724,21 +1748,38 @@ const SIZE_BASE = [
   { code: '5XL', label: '5XL', add: 25000 },
 ];
 
+// Size anak: 2, 4, 6, 8, 10, 12, 14 — dibagi 2 grup harga (masing2 bisa diatur selisihnya sendiri)
+const SIZE_BASE_ANAK = [
+  { code: 'A2',  label: '2',  tier: 'A' },
+  { code: 'A4',  label: '4',  tier: 'A' },
+  { code: 'A6',  label: '6',  tier: 'A' },
+  { code: 'A8',  label: '8',  tier: 'A' },
+  { code: 'A10', label: '10', tier: 'B' },
+  { code: 'A12', label: '12', tier: 'B' },
+  { code: 'A14', label: '14', tier: 'B' },
+];
+
 // Tambahan harga untuk varian panjang
 const PANJANG_ADD = 10000;
 const PANJANG_RIB_ADD = 15000;
 
-// Generate SIZES: Normal + Panjang + Panjang+Rib untuk tiap ukuran
+// Generate SIZES: Normal + Panjang + Panjang+Rib untuk tiap ukuran dewasa, + size anak (2 tier harga)
 function buildSizes() {
   const result = [];
   SIZE_BASE.forEach(s => {
-    result.push({ code: s.code,          label: s.label,          add: s.add,                            group: 'Normal',      baseCode: s.code });
-    result.push({ code: s.code+'_P',     label: s.label+' PJG',      add: s.add + PANJANG_ADD,              group: 'Panjang',     baseCode: s.code });
-    result.push({ code: s.code+'_PR',    label: s.label+' PJG+RIB',  add: s.add + PANJANG_RIB_ADD,          group: 'Panjang+Rib', baseCode: s.code });
+    result.push({ code: s.code,          label: s.label,          add: s.add,                            group: 'Normal',      baseCode: s.code, category: 'dewasa' });
+    result.push({ code: s.code+'_P',     label: s.label+' PJG',      add: s.add + PANJANG_ADD,              group: 'Panjang',     baseCode: s.code, category: 'dewasa' });
+    result.push({ code: s.code+'_PR',    label: s.label+' PJG+RIB',  add: s.add + PANJANG_RIB_ADD,          group: 'Panjang+Rib', baseCode: s.code, category: 'dewasa' });
+  });
+  const discA = (store && store.settings && store.settings.kidsDiscountA != null) ? store.settings.kidsDiscountA : 20000;
+  const discB = (store && store.settings && store.settings.kidsDiscountB != null) ? store.settings.kidsDiscountB : 10000;
+  SIZE_BASE_ANAK.forEach(s => {
+    const disc = s.tier === 'A' ? discA : discB;
+    result.push({ code: s.code, label: s.label, add: -disc, group: 'Anak', tier: s.tier, baseCode: s.code, category: 'anak' });
   });
   return result;
 }
-const SIZES = buildSizes();
+let SIZES = buildSizes();
 
 let currentPrintType = 'a4';
 let currentDetailOrder = null;
@@ -1889,6 +1930,8 @@ function openSettingsModal() {
   document.getElementById('s-bank-name').value = s.bankName || '';
   document.getElementById('s-bank-no').value = s.bankNo || '';
   document.getElementById('s-bank-owner').value = s.bankOwner || '';
+  document.getElementById('s-kids-discount-a').value = (s.kidsDiscountA != null ? s.kidsDiscountA : 20000);
+  document.getElementById('s-kids-discount-b').value = (s.kidsDiscountB != null ? s.kidsDiscountB : 10000);
   // Logo preview
   if (s.logoData) {
     document.getElementById('logo-preview-img').src = s.logoData;
@@ -1952,14 +1995,19 @@ function saveSettings() {
     bankName: document.getElementById('s-bank-name').value,
     bankNo: document.getElementById('s-bank-no').value,
     bankOwner: document.getElementById('s-bank-owner').value,
+    kidsDiscountA: parseFloat(document.getElementById('s-kids-discount-a').value) || 0,
+    kidsDiscountB: parseFloat(document.getElementById('s-kids-discount-b').value) || 0,
     logoData,
   };
   saveData();
   toast('✅ Pengaturan tersimpan!', 'success');
   closeModal('settings-modal');
+  SIZES = buildSizes();
+  try { renderSizeGrid(); } catch(e) {}
   try { updateTopbarLogo(); } catch(e) {}
   try { recalculate(); } catch(e) {}
 }
+
 
 // ===================================================
 // PRODUK TYPE & CUTTING
@@ -2076,13 +2124,49 @@ function renderSizeGrid() {
     </tr>`;
   });
 
-  container.innerHTML = `<table class="size-table-wrap">${colHeaders}<tbody>${rows}</tbody></table>`;
+  const discA = (store.settings && store.settings.kidsDiscountA != null) ? store.settings.kidsDiscountA : 20000;
+  const discB = (store.settings && store.settings.kidsDiscountB != null) ? store.settings.kidsDiscountB : 10000;
+
+  function kidsTierBlock(tierLabel, inputId, defaultDisc, sizesArr) {
+    const rows = sizesArr.map(s => `<tr>
+      <td>
+        <div class="size-row-label">
+          <span style="font-size:13px;font-weight:700">${s.label}</span>
+        </div>
+      </td>
+      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}" oninput="recalculate()"></td>
+    </tr>`).join('');
+    return `
+      <div style="display:flex;align-items:center;gap:8px;margin:10px 0 6px">
+        <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">${tierLabel}</span>
+        <span style="font-size:11px;color:var(--text-muted)">selisih (Rp lebih murah):</span>
+        <input type="number" inputmode="numeric" id="${inputId}" value="${defaultDisc}" oninput="recalculate()" style="width:90px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--brand);font-weight:700;font-size:12px">
+      </div>
+      <table class="size-table-wrap"><tbody>${rows}</tbody></table>`;
+  }
+
+  const kidsGroupA = SIZE_BASE_ANAK.filter(s => s.tier === 'A');
+  const kidsGroupB = SIZE_BASE_ANAK.filter(s => s.tier === 'B');
+
+  container.innerHTML = `
+    <table class="size-table-wrap">${colHeaders}<tbody>${rows}</tbody></table>
+    <div class="size-group-title" style="margin-top:14px">👶 Ukuran Anak</div>
+    ${kidsTierBlock('Size 2 – 8 Thn', 'anak-diff-A', discA, kidsGroupA)}
+    ${kidsTierBlock('Size 10 – 14 Thn', 'anak-diff-B', discB, kidsGroupB)}
+  `;
 }
 
 function getSizeData() {
+  const diffA = parseFloat(document.getElementById('anak-diff-A')?.value);
+  const diffB = parseFloat(document.getElementById('anak-diff-B')?.value);
   return SIZES.map(s => {
     const qty = parseInt(document.getElementById('qty-' + s.code)?.value || '0') || 0;
-    return { ...s, qty };
+    let add = s.add;
+    if (s.category === 'anak') {
+      if (s.tier === 'A' && !isNaN(diffA)) add = -diffA;
+      if (s.tier === 'B' && !isNaN(diffB)) add = -diffB;
+    }
+    return { ...s, add, qty };
   }).filter(s => s.qty > 0);
 }
 
@@ -3088,17 +3172,62 @@ function renderEditSizeGrid(o) {
       <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="+0" id="eadd-${s.code}" value="${customAdd||''}" oninput="recalcEditSizes()" title="Tambahan harga ukuran ${s.label} vs dasar" style="color:var(--accent)"></td>
     </tr>`;
   });
+  function findTierDiscount(tierCodes, fallback) {
+    for (const code of tierCodes) {
+      const entry = o.sizes.find(x => x.code === code);
+      if (entry) return -(entry.customAdd ?? entry.add ?? -fallback);
+    }
+    return fallback;
+  }
+  const discA = (store.settings && store.settings.kidsDiscountA != null) ? store.settings.kidsDiscountA : 20000;
+  const discB = (store.settings && store.settings.kidsDiscountB != null) ? store.settings.kidsDiscountB : 10000;
+  const kidsGroupA = SIZE_BASE_ANAK.filter(s => s.tier === 'A');
+  const kidsGroupB = SIZE_BASE_ANAK.filter(s => s.tier === 'B');
+  const eDiscA = findTierDiscount(kidsGroupA.map(s=>s.code), discA);
+  const eDiscB = findTierDiscount(kidsGroupB.map(s=>s.code), discB);
+
+  function kidsTierRows(sizesArr) {
+    return sizesArr.map(s => {
+      const qty = (o.sizes.find(x=>x.code===s.code)?.qty)||0;
+      return `<tr>
+        <td style="font-size:12px;font-weight:700;padding:3px 0;width:36px">${s.label}</td>
+        <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}" value="${qty||''}" oninput="recalcEditSizes()"></td>
+      </tr>`;
+    }).join('');
+  }
+
   wrap.innerHTML = `<table class="size-table-wrap">
     <thead><tr>
       <th style="text-align:left;padding-left:0">Ukur</th>
       <th>Pendek</th><th>Panjang</th><th>Pjg+Rib</th><th style="color:var(--accent)">+Harga</th>
     </tr></thead><tbody>${rows}</tbody></table>
-    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">💡 +Harga = selisih harga ukuran ini vs harga dasar</div>`;
+    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">💡 +Harga = selisih harga ukuran ini vs harga dasar</div>
+    <div class="size-group-title" style="margin-top:14px">👶 Ukuran Anak</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:8px 0 6px">
+      <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Size 2–8 Thn</span>
+      <span style="font-size:11px;color:var(--text-muted)">selisih:</span>
+      <input type="number" inputmode="numeric" id="eanak-diff-A" value="${eDiscA}" oninput="recalcEditSizes()" style="width:90px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
+    </div>
+    <table class="size-table-wrap"><tbody>${kidsTierRows(kidsGroupA)}</tbody></table>
+    <div style="display:flex;align-items:center;gap:8px;margin:10px 0 6px">
+      <span style="font-size:12px;font-weight:700;color:var(--text-secondary)">Size 10–14 Thn</span>
+      <span style="font-size:11px;color:var(--text-muted)">selisih:</span>
+      <input type="number" inputmode="numeric" id="eanak-diff-B" value="${eDiscB}" oninput="recalcEditSizes()" style="width:90px;padding:5px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--accent);font-weight:700;font-size:12px">
+    </div>
+    <table class="size-table-wrap"><tbody>${kidsTierRows(kidsGroupB)}</tbody></table>`;
 }
 
 function getEditSizeData() {
+  const eDiffA = parseFloat(document.getElementById('eanak-diff-A')?.value);
+  const eDiffB = parseFloat(document.getElementById('eanak-diff-B')?.value);
   return SIZES.map(s => {
     const qty = parseInt(document.getElementById('eqty-' + s.code)?.value || '0') || 0;
+    if (s.category === 'anak') {
+      let add = s.add;
+      if (s.tier === 'A' && !isNaN(eDiffA)) add = -eDiffA;
+      if (s.tier === 'B' && !isNaN(eDiffB)) add = -eDiffB;
+      return { ...s, qty, add, customAdd: add };
+    }
     // Read custom add-on from SIZE_BASE row (not _P or _PR variants)
     const baseCode = s.baseCode || s.code;
     const addEl = document.getElementById('eadd-' + baseCode);
@@ -3932,32 +4061,99 @@ function renderBelanja() {
 
 // ===================================================
 // DASHBOARD
+// Bulan  = lihat 12 bulan dalam 1 tahun (pilih tahun)
+// Minggu = lihat 4-5 minggu dalam 1 bulan (pilih bulan & tahun)
+// Hari   = lihat 7 hari (Senin–Minggu) dalam minggu berjalan
 // ===================================================
-let dashTab = 'week';
+let dashTab = 'year'; // 'year' = Bulan, 'month' = Minggu, 'week' = Hari
+let dashYear = new Date().getFullYear();
+let dashMonth = new Date().getMonth();
+let dashMonthYear = new Date().getFullYear();
+const MONTH_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
 function setDashTab(tab, el) {
   dashTab = tab;
   document.querySelectorAll('#page-dashboard .tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
+  const yearPicker = document.getElementById('dash-year-picker');
+  const monthPicker = document.getElementById('dash-month-picker');
+  if (yearPicker) yearPicker.style.display = (tab === 'year') ? '' : 'none';
+  if (monthPicker) monthPicker.style.display = (tab === 'month') ? 'flex' : 'none';
+  if (tab === 'year') populateDashYearSelect();
+  if (tab === 'month') populateDashMonthSelect();
   renderDashboard();
+}
+
+function getOrderYears() {
+  const allOrders = (store.orders || []).filter(o => o && o.id && o.date);
+  const yearsSet = new Set(allOrders.map(o => { try { return new Date(o.date).getFullYear(); } catch(e){ return null; } }).filter(Boolean));
+  yearsSet.add(new Date().getFullYear());
+  return Array.from(yearsSet).sort((a,b) => b - a);
+}
+
+function populateDashYearSelect() {
+  const sel = document.getElementById('dash-year-select');
+  if (!sel) return;
+  const years = getOrderYears();
+  sel.innerHTML = years.map(y => `<option value="${y}" ${y === dashYear ? 'selected' : ''}>Tahun ${y}</option>`).join('');
+}
+
+function onDashYearChange() {
+  const sel = document.getElementById('dash-year-select');
+  if (!sel) return;
+  dashYear = parseInt(sel.value) || new Date().getFullYear();
+  renderDashboard();
+}
+
+function populateDashMonthSelect() {
+  const selM = document.getElementById('dash-month-select');
+  const selY = document.getElementById('dash-month-year-select');
+  if (!selM || !selY) return;
+  selM.innerHTML = MONTH_NAMES.map((m,i) => `<option value="${i}" ${i === dashMonth ? 'selected' : ''}>${m}</option>`).join('');
+  const years = getOrderYears();
+  selY.innerHTML = years.map(y => `<option value="${y}" ${y === dashMonthYear ? 'selected' : ''}>${y}</option>`).join('');
+}
+
+function onDashMonthChange() {
+  const selM = document.getElementById('dash-month-select');
+  const selY = document.getElementById('dash-month-year-select');
+  if (!selM || !selY) return;
+  dashMonth = parseInt(selM.value) || 0;
+  dashMonthYear = parseInt(selY.value) || new Date().getFullYear();
+  renderDashboard();
+}
+
+function getStartOfWeekSenin(d) {
+  const dayIdx = (d.getDay() + 6) % 7; // Senin=0 ... Minggu=6
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dayIdx);
+  start.setHours(0,0,0,0);
+  return start;
 }
 
 function renderDashboard() {
   try {
   const now = new Date();
-  const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const start = dashTab === 'week' ? startOfWeek : startOfMonth;
+  const startOfWeek = getStartOfWeekSenin(now);
+  const startOfMonth = new Date(dashMonthYear, dashMonth, 1);
+  const endOfMonth   = new Date(dashMonthYear, dashMonth + 1, 1);
+  const startOfYear  = new Date(dashYear, 0, 1);
+  const endOfYear    = new Date(dashYear + 1, 0, 1);
+
+  let start, end;
+  if (dashTab === 'week') { start = startOfWeek; end = new Date(startOfWeek.getTime() + 7*86400000); }
+  else if (dashTab === 'month') { start = startOfMonth; end = endOfMonth; }
+  else { start = startOfYear; end = endOfYear; } // 'year'
 
   const allOrders = (store.orders || []).filter(o => o && o.id);
-  const orders = allOrders.filter(o => { try { return new Date(o.date) >= start; } catch(e){ return false; } });
+  const orders = allOrders.filter(o => { try { const d = new Date(o.date); return d >= start && d < end; } catch(e){ return false; } });
   const revenue = orders.reduce((a, o) => a + (o.totalRevenue||0), 0);
   const totalQty = orders.reduce((a, o) => a + (o.totalQty||0), 0);
   const lunas = orders.filter(o => o.payStatus === 'Lunas').length;
 
-  const prevStart = dashTab === 'week'
-    ? new Date(startOfWeek.getTime() - 7*86400000)
-    : new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevEnd = dashTab === 'week' ? startOfWeek : startOfMonth;
+  let prevStart, prevEnd;
+  if (dashTab === 'week') { prevStart = new Date(start.getTime() - 7*86400000); prevEnd = start; }
+  else if (dashTab === 'month') { prevStart = new Date(dashMonthYear, dashMonth - 1, 1); prevEnd = startOfMonth; }
+  else { prevStart = new Date(dashYear - 1, 0, 1); prevEnd = startOfYear; }
   const prevOrders = allOrders.filter(o => { try { return new Date(o.date) >= prevStart && new Date(o.date) < prevEnd; } catch(e){ return false; } });
   const prevRevenue = prevOrders.reduce((a, o) => a + (o.totalRevenue||0), 0);
   const change = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue * 100).toFixed(1) : null;
@@ -3998,23 +4194,42 @@ function renderChart() {
   try {
   const chartArea = document.getElementById('chart-area');
   if (!chartArea) return;
-  const now = new Date();
   const safeOrders = (store.orders || []).filter(o => o && o.id);
   if (dashTab === 'week') {
-    const days = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+    const days = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
     const data = Array(7).fill(0);
-    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
+    const now = new Date();
+    const startOfWeek = getStartOfWeekSenin(now);
+    const endOfWeek = new Date(startOfWeek.getTime() + 7*86400000);
     safeOrders.forEach(o => {
-      try { const d = new Date(o.date); if (d >= startOfWeek) { data[d.getDay()] += (o.totalRevenue||0); } } catch(e){}
+      try {
+        const d = new Date(o.date);
+        if (d >= startOfWeek && d < endOfWeek) {
+          const idx = (d.getDay() + 6) % 7;
+          data[idx] += (o.totalRevenue||0);
+        }
+      } catch(e){}
     });
     renderBarChart(chartArea, days, data);
-  } else {
+  } else if (dashTab === 'month') {
     const weeks = ['M1','M2','M3','M4','M5'];
     const data = Array(5).fill(0);
     safeOrders.forEach(o => {
-      try { const d = new Date(o.date); if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) { data[Math.min(Math.floor((d.getDate()-1)/7), 4)] += (o.totalRevenue||0); } } catch(e){}
+      try {
+        const d = new Date(o.date);
+        if (d.getMonth() === dashMonth && d.getFullYear() === dashMonthYear) {
+          data[Math.min(Math.floor((d.getDate()-1)/7), 4)] += (o.totalRevenue||0);
+        }
+      } catch(e){}
     });
     renderBarChart(chartArea, weeks, data);
+  } else { // year
+    const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+    const data = Array(12).fill(0);
+    safeOrders.forEach(o => {
+      try { const d = new Date(o.date); if (d.getFullYear() === dashYear) { data[d.getMonth()] += (o.totalRevenue||0); } } catch(e){}
+    });
+    renderBarChart(chartArea, months, data);
   }
   } catch(e) { console.error('renderChart error:', e); }
 }
@@ -4350,11 +4565,13 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 try { loadData(); } catch(e) { console.error('loadData error:', e); }
+try { if (store.settings.kidsDiscountA == null) store.settings.kidsDiscountA = 20000; if (store.settings.kidsDiscountB == null) store.settings.kidsDiscountB = 10000; SIZES = buildSizes(); } catch(e) { console.error('rebuild SIZES error:', e); }
 try { loadTheme(); } catch(e) {}
 try { syncThemePicker(); } catch(e) {}
 try { renderSizeGrid(); } catch(e) { console.error('renderSizeGrid error:', e); }
 try { renderCuttingBtns(); } catch(e) {}
 try { updateProdukSummary(); } catch(e) {}
+try { populateDashYearSelect(); } catch(e) {}
 try { renderDashboard(); } catch(e) { console.error('renderDashboard init error:', e); }
 try { recalculate(); } catch(e) {}
 try { updateTopbarLogo(); } catch(e) {}
