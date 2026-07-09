@@ -106,31 +106,31 @@
   --accent: #FBBF24;
 }
 
-/* ===== FLAME THEME (Merah-Oranye-Putih) ===== */
+/* ===== INSTAGRAM THEME (Light) ===== */
 [data-theme="flame"] {
-  --brand: #E8400C;
-  --brand-light: #FFF1ED;
-  --brand-dark: #C0320A;
-  --accent: #F97316;
-  --accent-light: #FFF7ED;
-  --danger: #DC2626;
-  --success: #16A34A;
-  --success-light: #F0FDF4;
+  --brand: #E1306C;
+  --brand-light: #FCE4EC;
+  --brand-dark: #C13584;
+  --accent: #0095F6;
+  --accent-light: #E7F5FF;
+  --danger: #ED4956;
+  --success: #3BA55D;
+  --success-light: #EAFBF1;
 
-  --bg: #FFF8F6;
+  --bg: #FAFAFA;
   --bg-card: #FFFFFF;
-  --bg-input: #FFFFFF;
-  --border: #FDDDD6;
-  --border-focus: #E8400C;
+  --bg-input: #FAFAFA;
+  --border: #DBDBDB;
+  --border-focus: #C13584;
 
-  --text-primary: #1C0A04;
-  --text-secondary: #78350F;
-  --text-muted: #A8784A;
+  --text-primary: #262626;
+  --text-secondary: #8E8E8E;
+  --text-muted: #C7C7C7;
   --text-inverse: #FFFFFF;
 
-  --shadow-sm: 0 1px 3px rgba(232,64,12,.08);
-  --shadow-md: 0 4px 16px rgba(232,64,12,.10);
-  --shadow-lg: 0 8px 32px rgba(232,64,12,.14);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.10);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.14);
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -138,24 +138,24 @@
 }
 
 [data-theme="flame-dark"] {
-  --brand: #FB7A3C;
-  --brand-light: #2D1200;
-  --brand-dark: #E8400C;
-  --accent: #FBBF24;
-  --accent-light: #2D1A00;
-  --danger: #F87171;
+  --brand: #F56040;
+  --brand-light: #3A0F22;
+  --brand-dark: #C13584;
+  --accent: #0095F6;
+  --accent-light: #062A3D;
+  --danger: #ED4956;
   --success: #4ADE80;
-  --success-light: #052E16;
+  --success-light: #0F2418;
 
-  --bg: #0F0804;
-  --bg-card: #1C0E07;
-  --bg-input: #221107;
-  --border: #3D1A0A;
-  --border-focus: #FB7A3C;
+  --bg: #000000;
+  --bg-card: #121212;
+  --bg-input: #1A1A1A;
+  --border: #262626;
+  --border-focus: #F56040;
 
-  --text-primary: #FDF4EF;
-  --text-secondary: #FBB99A;
-  --text-muted: #A8612A;
+  --text-primary: #FAFAFA;
+  --text-secondary: #A8A8A8;
+  --text-muted: #737373;
   --text-inverse: #FFFFFF;
 
   --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
@@ -163,10 +163,10 @@
   --shadow-lg: 0 8px 32px rgba(0,0,0,.6);
 }
 
-/* ===== FLAME: component overrides ===== */
+/* ===== INSTAGRAM THEME: component overrides ===== */
 [data-theme="flame"] .hpp-box,
 [data-theme="flame-dark"] .hpp-box {
-  background: linear-gradient(135deg, #7C1500 0%, #C0320A 100%);
+  background: linear-gradient(135deg, #833AB4 0%, #C13584 50%, #F56040 100%);
 }
 [data-theme="flame"] .topbar,
 [data-theme="flame-dark"] .topbar {
@@ -175,12 +175,12 @@
 }
 [data-theme="flame"] .logo-icon,
 [data-theme="flame-dark"] .logo-icon {
-  background: linear-gradient(135deg, #E8400C, #FB923C);
+  background: linear-gradient(135deg, #833AB4, #E1306C, #F77737);
 }
 [data-theme="flame"] .fab,
 [data-theme="flame-dark"] .fab {
   background: var(--brand);
-  box-shadow: 0 4px 16px rgba(232,64,12,.45);
+  box-shadow: 0 4px 16px rgba(193,53,132,.45);
 }
 [data-theme="flame"] .btn-primary,
 [data-theme="flame-dark"] .btn-primary {
@@ -192,7 +192,7 @@
 }
 [data-theme="flame"] .progress-bar-fill,
 [data-theme="flame-dark"] .progress-bar-fill {
-  background: linear-gradient(90deg, #FB923C, #FBBF24);
+  background: linear-gradient(90deg, #833AB4, #E1306C, #F77737);
 }
 [data-theme="flame"] .nav-item.active,
 [data-theme="flame-dark"] .nav-item.active {
@@ -208,7 +208,7 @@
   background: var(--brand-light);
 }
 [data-theme="flame-dark"] .hpp-box {
-  background: linear-gradient(135deg, #3D0A00 0%, #7C1500 100%);
+  background: linear-gradient(135deg, #5B1A70 0%, #A02B5F 60%, #C1481E 100%);
 }
 
 /* ===== THEME PICKER ===== */
@@ -237,12 +237,12 @@
    FLAME LAYOUT OVERRIDES — beda tata letak & feel
    =================================================== */
 
-/* Topbar: gradient merah-oranye penuh */
+/* Topbar: gradient khas Instagram (ungu-pink-oranye) */
 [data-theme="flame"] .topbar,
 [data-theme="flame-dark"] .topbar {
-  background: linear-gradient(135deg, #C0320A 0%, #E8400C 50%, #F97316 100%);
+  background: linear-gradient(135deg, #405DE6 0%, #833AB4 25%, #C13584 50%, #E1306C 70%, #F77737 100%);
   border-bottom: none;
-  box-shadow: 0 4px 20px rgba(232,64,12,.35);
+  box-shadow: 0 4px 20px rgba(193,53,132,.35);
 }
 [data-theme="flame"] .topbar-title,
 [data-theme="flame-dark"] .topbar-title { color: #fff; font-size: 18px; letter-spacing: -.3px; }
@@ -282,10 +282,10 @@
 }
 [data-theme="flame"] .nav-item.active,
 [data-theme="flame-dark"] .nav-item.active {
-  background: linear-gradient(135deg, #E8400C, #F97316);
+  background: linear-gradient(135deg, #833AB4, #C13584, #F77737);
   color: #fff !important;
   border-color: transparent;
-  box-shadow: 0 4px 16px rgba(232,64,12,.4);
+  box-shadow: 0 4px 16px rgba(193,53,132,.4);
 }
 [data-theme="flame"] .nav-item.active .nav-icon,
 [data-theme="flame-dark"] .nav-item.active .nav-icon { transform: scale(1.15); }
@@ -300,8 +300,8 @@
 [data-theme="flame-dark"] .fab {
   width: 100%; height: 58px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #E8400C, #FB923C);
-  box-shadow: 0 4px 20px rgba(232,64,12,.5);
+  background: linear-gradient(135deg, #833AB4, #E1306C, #F77737);
+  box-shadow: 0 4px 20px rgba(193,53,132,.5);
   transform: none;
   font-size: 28px;
   font-weight: 300;
@@ -309,7 +309,7 @@
 [data-theme="flame"] .fab:active,
 [data-theme="flame-dark"] .fab:active {
   transform: scale(.96);
-  box-shadow: 0 2px 10px rgba(232,64,12,.3);
+  box-shadow: 0 2px 10px rgba(193,53,132,.3);
 }
 
 /* Cards: left accent border */
@@ -335,7 +335,7 @@
 [data-theme="flame"] .section-title,
 [data-theme="flame-dark"] .section-title {
   font-size: 22px;
-  background: linear-gradient(135deg, #C0320A, #F97316);
+  background: linear-gradient(135deg, #833AB4, #E1306C, #F77737);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -359,16 +359,16 @@
 [data-theme="flame-dark"] .tab { border-radius: 99px; }
 [data-theme="flame"] .tab.active,
 [data-theme="flame-dark"] .tab.active {
-  background: linear-gradient(135deg, #E8400C, #F97316);
+  background: linear-gradient(135deg, #833AB4, #C13584, #F77737);
   color: #fff !important;
-  box-shadow: 0 2px 8px rgba(232,64,12,.35);
+  box-shadow: 0 2px 8px rgba(193,53,132,.35);
 }
 
 /* Buttons */
 [data-theme="flame"] .btn-primary,
 [data-theme="flame-dark"] .btn-primary {
-  background: linear-gradient(135deg, #E8400C, #F97316);
-  box-shadow: 0 2px 8px rgba(232,64,12,.3);
+  background: linear-gradient(135deg, #833AB4, #E1306C, #F77737);
+  box-shadow: 0 2px 8px rgba(193,53,132,.3);
 }
 [data-theme="flame"] .btn-outline,
 [data-theme="flame-dark"] .btn-outline {
@@ -378,10 +378,10 @@
 
 /* HPP box */
 [data-theme="flame"] .hpp-box {
-  background: linear-gradient(135deg, #7C1500 0%, #C0320A 60%, #F97316 100%);
+  background: linear-gradient(135deg, #405DE6 0%, #C13584 60%, #F77737 100%);
 }
 [data-theme="flame-dark"] .hpp-box {
-  background: linear-gradient(135deg, #3D0A00 0%, #7C1500 60%, #C0320A 100%);
+  background: linear-gradient(135deg, #2E1A66 0%, #833AB4 60%, #C13584 100%);
 }
 
 /* Progress bar */
@@ -394,7 +394,7 @@
 [data-theme="flame"] .search-bar:focus,
 [data-theme="flame-dark"] .search-bar:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(232,64,12,.12);
+  box-shadow: 0 0 0 3px rgba(193,53,132,.12);
 }
 
 /* Content padding adjustment for flame pill nav */
@@ -465,9 +465,11 @@ body {
   color: var(--text-muted); font-size: 10px; font-weight: 600;
   font-family: 'Inter', sans-serif; transition: color .15s;
 }
-.nav-item .nav-icon { font-size: 22px; line-height: 1; }
+.nav-item .nav-icon { font-size: 22px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.nav-item .nav-icon svg { width: 23px; height: 23px; stroke: currentColor; }
 .nav-item.active { color: var(--brand); }
 .nav-item.active .nav-icon { transform: scale(1.1); }
+.nav-item.active .nav-icon svg { stroke-width: 2.2; }
 
 /* FAB - center add button */
 .fab-wrap { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding-top: 0; }
@@ -712,7 +714,7 @@ body {
 .toast.toast-warn    { background: linear-gradient(135deg, #D97706, #F59E0B); color:#fff; }
 [data-theme="flame"] .toast,
 [data-theme="flame-dark"] .toast {
-  background: linear-gradient(135deg, #C0320A, #E8400C);
+  background: linear-gradient(135deg, #833AB4, #E1306C, #F77737);
 }
 
 /* ===================== PRODUCT TYPE SELECTOR ===================== */
@@ -867,8 +869,8 @@ body {
       <div class="topbar-title" id="topbar-title">SablonPro</div>
     </div>
     <div class="topbar-actions">
-      <button class="btn btn-ghost btn-icon" style="font-size:18px" onclick="refreshApp()" title="Refresh">🔄</button>
-      <button class="btn btn-ghost btn-icon" style="font-size:18px" onclick="openSettingsModal()">⚙️</button>
+      <button class="btn btn-ghost btn-icon" onclick="refreshApp()" title="Refresh"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
+      <button class="btn btn-ghost btn-icon" onclick="openSettingsModal()"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
   </div>
 
@@ -1172,22 +1174,22 @@ body {
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <button class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')">
-      <span class="nav-icon">📊</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg></span>
       <span>Dashboard</span>
     </button>
     <button class="nav-item" id="nav-history" onclick="navigate('history')">
-      <span class="nav-icon">📋</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
       <span>Riwayat</span>
     </button>
     <div class="fab-wrap" id="nav-order">
       <button class="fab" onclick="navigate('order')" title="Order Baru">＋</button>
     </div>
     <button class="nav-item" id="nav-cashflow" onclick="navigate('cashflow')">
-      <span class="nav-icon">💰</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="15.5" cy="14.5" r="1.4" fill="currentColor" stroke="none"/></svg></span>
       <span>Keuangan</span>
     </button>
     <button class="nav-item" onclick="openSettingsModal()">
-      <span class="nav-icon">⚙️</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3.2"/></svg></span>
       <span>Toko</span>
     </button>
   </nav>
@@ -1298,24 +1300,24 @@ body {
         </div>
         <div class="theme-card" data-theme-val="flame" onclick="applyTheme('flame')">
           <div class="tc-preview">
-            <div style="flex:1;background:linear-gradient(180deg,#E8400C,#F97316)"></div>
-            <div style="flex:2;background:#FFF8F6;display:flex;flex-direction:column;padding:4px;gap:2px">
-              <div style="height:6px;background:#FDDDD6;border-radius:2px"></div>
-              <div style="height:6px;background:#FDDDD6;border-radius:2px;width:70%"></div>
+            <div style="flex:1;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737)"></div>
+            <div style="flex:2;background:#FAFAFA;display:flex;flex-direction:column;padding:4px;gap:2px">
+              <div style="height:6px;background:#DBDBDB;border-radius:2px"></div>
+              <div style="height:6px;background:#DBDBDB;border-radius:2px;width:70%"></div>
             </div>
           </div>
-          <div class="tc-label">🔥 Flame Light</div>
+          <div class="tc-label">📸 Instagram Light</div>
           <div class="tc-check">✓</div>
         </div>
         <div class="theme-card" data-theme-val="flame-dark" onclick="applyTheme('flame-dark')">
           <div class="tc-preview">
-            <div style="flex:1;background:linear-gradient(180deg,#FB7A3C,#E8400C)"></div>
-            <div style="flex:2;background:#0F0804;display:flex;flex-direction:column;padding:4px;gap:2px">
-              <div style="height:6px;background:#3D1A0A;border-radius:2px"></div>
-              <div style="height:6px;background:#3D1A0A;border-radius:2px;width:70%"></div>
+            <div style="flex:1;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737)"></div>
+            <div style="flex:2;background:#000000;display:flex;flex-direction:column;padding:4px;gap:2px">
+              <div style="height:6px;background:#262626;border-radius:2px"></div>
+              <div style="height:6px;background:#262626;border-radius:2px;width:70%"></div>
             </div>
           </div>
-          <div class="tc-label">🌋 Flame Dark</div>
+          <div class="tc-label">📸 Instagram Dark</div>
           <div class="tc-check">✓</div>
         </div>
       </div>
@@ -3594,22 +3596,39 @@ function setBelanjaTab(tab, el) {
 // ===================================================
 function renderCashflow() {
   try {
-  // Populate month filter
+  // Populate month filter — dibangun dari SEMUA sumber data (kas, belanja, hutang, piutang, invoice),
+  // bukan cuma dari store.cashflow, supaya bulan yang cuma ada data belanja tetap muncul sbg opsi.
   const sel = document.getElementById('cf-filter-month');
   if (sel) {
     const months = new Set();
-    store.cashflow.forEach(c => {
-      const d = new Date(c.date);
-      months.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
-    });
+    const addDate = (dateStr) => {
+      const d = new Date(dateStr);
+      if (!isNaN(d)) months.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    };
+    store.cashflow.forEach(c => addDate(c.date));
+    store.belanja.forEach(x => addDate(x.date));
+    store.hutang.forEach(x => addDate(x.date));
+    store.piutang.forEach(x => addDate(x.date));
+    store.orders.forEach(o => addDate(o.date));
     const sorted = [...months].sort().reverse();
-    const cur = sel.value;
+    const now = new Date();
+    const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const prev = sel.value;
+    // Tentukan bulan yang seharusnya terpilih: pertahankan pilihan sebelumnya kalau masih valid,
+    // kalau tidak, default ke bulan berjalan (kalau ada datanya) atau ke bulan terbaru yang ada.
+    let desired = prev;
+    if (!sorted.includes(desired)) {
+      desired = sorted.includes(thisMonthKey) ? thisMonthKey : (sorted[0] || '');
+    }
     sel.innerHTML = `<option value="">📅 Semua Bulan</option>` +
       sorted.map(m => {
         const [y, mo] = m.split('-');
         const label = new Date(+y, +mo-1, 1).toLocaleDateString('id-ID', {month:'long', year:'numeric'});
-        return `<option value="${m}" ${cur===m?'selected':''}>${label}</option>`;
+        return `<option value="${m}">${label}</option>`;
       }).join('');
+    // Set eksplisit via property, bukan mengandalkan atribut "selected" di string HTML —
+    // ini memastikan sel.value benar-benar sinkron dengan apa yang dipakai untuk filter di bawah.
+    sel.value = desired;
   }
 
   const filterMonth = sel ? sel.value : '';
