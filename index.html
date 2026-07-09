@@ -3614,8 +3614,9 @@ function renderCashflow() {
 
   const filterMonth = sel ? sel.value : '';
   let cfAll = store.cashflow;
+  let fy, fm;
   if (filterMonth) {
-    const [fy, fm] = filterMonth.split('-').map(Number);
+    [fy, fm] = filterMonth.split('-').map(Number);
     cfAll = cfAll.filter(c => { const d = new Date(c.date); return d.getFullYear()===fy && d.getMonth()+1===fm; });
   }
   // Feed: semua cashflow tampil termasuk HPP invoice (bisa diedit/dihapus)
@@ -3623,14 +3624,28 @@ function renderCashflow() {
   const monthKeyOf = ts => { const d = new Date(ts); return isNaN(d) ? 'unknown' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
   const totalIn  = cfAll.filter(c => c.type === 'in').reduce((a, c) => a + c.amount, 0);
   const totalOut = cfAll.filter(c => c.type === 'out').reduce((a, c) => a + c.amount, 0);
-  const totalHppOrders = store.orders.reduce((a, o) => a + (o.hpp?.totalHpp || 0), 0);
 
-  // Belanja total (all time — berdiri sendiri, tidak difilter bulan agar konsisten)
-  const totalBelanja = store.belanja.reduce((a, x) => a + x.amount, 0);
+  // Helper: cek apakah tanggal termasuk bulan yang lagi difilter.
+  // Kalau "Semua Bulan" dipilih (filterMonth kosong), semua tanggal dianggap masuk.
+  const inFilterMonth = (dateStr) => {
+    if (!filterMonth) return true;
+    const d = new Date(dateStr);
+    return !isNaN(d) && d.getFullYear() === fy && d.getMonth() + 1 === fm;
+  };
 
-  // Piutang & hutang yang belum lunas (all time)
-  const totalPiutang = store.piutang.filter(x => !x.lunas).reduce((a, x) => a + x.amount, 0);
-  const totalHutang  = store.hutang.filter(x => !x.lunas).reduce((a, x) => a + x.amount, 0);
+  // Pengeluaran Invoice: HANYA order di bulan yang difilter (reset tiap bulan)
+  const totalHppOrders = store.orders
+    .filter(o => inFilterMonth(o.date))
+    .reduce((a, o) => a + (o.hpp?.totalHpp || 0), 0);
+
+  // Pengeluaran Belanja: HANYA belanja di bulan yang difilter (reset tiap bulan)
+  const totalBelanja = store.belanja
+    .filter(x => inFilterMonth(x.date))
+    .reduce((a, x) => a + x.amount, 0);
+
+  // Piutang & hutang yang belum lunas, dalam bulan yang difilter (reset tiap bulan)
+  const totalPiutang = store.piutang.filter(x => !x.lunas && inFilterMonth(x.date)).reduce((a, x) => a + x.amount, 0);
+  const totalHutang  = store.hutang.filter(x => !x.lunas && inFilterMonth(x.date)).reduce((a, x) => a + x.amount, 0);
 
   // Saldo Bersih = Pemasukan + Piutang - Hutang - Total Belanja
   const saldo = totalIn + totalPiutang - totalHutang - totalBelanja;
