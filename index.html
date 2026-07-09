@@ -834,6 +834,20 @@ body {
 .cf-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); gap: 10px; }
 .cf-item:last-child { border-bottom: none; }
 
+/* Month group header (history & cashflow) */
+.month-group { margin-bottom: 18px; }
+.month-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; margin-bottom: 8px; border-radius: var(--radius-sm);
+  background: var(--bg-input); border: 1px solid var(--border);
+}
+.month-group-title { font-size: 12.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--text-secondary); }
+.month-group-stats { font-size: 11px; font-weight: 700; text-align: right; line-height: 1.5; }
+.month-group-trend { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+.month-trend-up { background: #ECFDF5; color: var(--success); }
+.month-trend-down { background: #FEF2F2; color: var(--danger); }
+.month-trend-flat { background: var(--border); color: var(--text-muted); }
+
 /* ===================== PRINT ===================== */
 @media print {
   .bottom-nav, .topbar, .topbar-actions { display: none !important; }
@@ -2927,9 +2941,9 @@ function renderHistory() {
       list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada order tersimpan</p></div>';
       return;
     }
-    const statusBadge = s => s === 'Lunas' ? `<span class="badge badge-success">✅ ${s}</span>` : s === 'DP' ? `<span class="badge badge-accent">💳 ${s}</span>` : `<span class="badge badge-danger">⏳ ${s}</span>`;
-    list.innerHTML = orders.map(o => {
+    const orderCardHtml = o => {
       try {
+        const statusBadge = s => s === 'Lunas' ? `<span class="badge badge-success">✅ ${s}</span>` : s === 'DP' ? `<span class="badge badge-accent">💳 ${s}</span>` : `<span class="badge badge-danger">⏳ ${s}</span>`;
         return `<div class="order-card" onclick="openDetail(${o.id})">
           <div class="order-card-top">
             <div>
@@ -2953,7 +2967,50 @@ function renderHistory() {
           </div>
         </div>`;
       } catch(e) { return ''; }
-    }).join('');
+    };
+
+    if (filterMonth) {
+      // Bulan spesifik dipilih -> list flat seperti biasa
+      list.innerHTML = orders.map(orderCardHtml).join('');
+    } else {
+      // "Semua Bulan" -> kelompokkan per bulan, urut terbaru dulu, dengan perbandingan naik/turun
+      const groups = {};
+      orders.forEach(o => {
+        const d = o.date ? new Date(o.date) : null;
+        const key = (d && !isNaN(d)) ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` : 'unknown';
+        (groups[key] = groups[key] || []).push(o);
+      });
+      const sortedKeys = Object.keys(groups).sort().reverse();
+      list.innerHTML = sortedKeys.map((key, idx) => {
+        const group = groups[key];
+        const label = key === 'unknown' ? 'Tanpa Tanggal' : new Date(+key.split('-')[0], +key.split('-')[1]-1, 1).toLocaleDateString('id-ID', {month:'long', year:'numeric'});
+        const totalOmset = group.reduce((a, o) => a + (o.totalRevenue||0), 0);
+        const totalPcs = group.reduce((a, o) => a + (o.totalQty||0), 0);
+        const prevKey = sortedKeys[idx+1]; // key bulan sebelumnya (lebih lama)
+        let trendHtml = '';
+        if (prevKey && prevKey !== 'unknown') {
+          const prevTotal = groups[prevKey].reduce((a, o) => a + (o.totalRevenue||0), 0);
+          if (prevTotal > 0) {
+            const diffPct = ((totalOmset - prevTotal) / prevTotal) * 100;
+            const cls = diffPct > 0.5 ? 'month-trend-up' : diffPct < -0.5 ? 'month-trend-down' : 'month-trend-flat';
+            const arrow = diffPct > 0.5 ? '▲' : diffPct < -0.5 ? '▼' : '▬';
+            trendHtml = `<span class="month-group-trend ${cls}">${arrow} ${Math.abs(diffPct).toFixed(0)}%</span>`;
+          } else if (totalOmset > 0) {
+            trendHtml = `<span class="month-group-trend month-trend-up">▲ baru</span>`;
+          }
+        }
+        return `<div class="month-group">
+          <div class="month-group-header">
+            <div class="month-group-title">🗓️ ${label}</div>
+            <div class="month-group-stats">
+              <div>${group.length} order • ${totalPcs} pcs</div>
+              <div style="color:var(--brand)">${fmtRp(totalOmset)} ${trendHtml}</div>
+            </div>
+          </div>
+          ${group.map(orderCardHtml).join('')}
+        </div>`;
+      }).join('');
+    }
   } catch(e) {
     if (list) list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Gagal memuat riwayat</p></div>';
     console.error('renderHistory error:', e);
@@ -3563,6 +3620,7 @@ function renderCashflow() {
   }
   // Feed: semua cashflow tampil termasuk HPP invoice (bisa diedit/dihapus)
   const cf = [...cfAll].reverse();
+  const monthKeyOf = ts => { const d = new Date(ts); return isNaN(d) ? 'unknown' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
   const totalIn  = cfAll.filter(c => c.type === 'in').reduce((a, c) => a + c.amount, 0);
   const totalOut = cfAll.filter(c => c.type === 'out').reduce((a, c) => a + c.amount, 0);
   const totalHppOrders = store.orders.reduce((a, o) => a + (o.hpp?.totalHpp || 0), 0);
@@ -3634,7 +3692,7 @@ function renderCashflow() {
   });
 
   store.hutang.forEach(x => feedItems.push({
-    _ts: new Date(x.date).getTime(), _typeKey: 'hutang',
+    _date: x.date, _ts: new Date(x.date).getTime(), _typeKey: 'hutang',
     icon: x.lunas ? '✅' : '🔴',
     label: `Hutang — ${x.pihak}`,
     sub: `${new Date(x.date).toLocaleDateString('id-ID')}${x.desc ? ' • ' + x.desc : ''}`,
@@ -3645,7 +3703,7 @@ function renderCashflow() {
   }));
 
   store.piutang.forEach(x => feedItems.push({
-    _ts: new Date(x.date).getTime(), _typeKey: 'piutang',
+    _date: x.date, _ts: new Date(x.date).getTime(), _typeKey: 'piutang',
     icon: x.lunas ? '✅' : '🟢',
     label: `Piutang — ${x.pihak}`,
     sub: `${new Date(x.date).toLocaleDateString('id-ID')}${x.desc ? ' • ' + x.desc : ''}`,
@@ -3656,7 +3714,7 @@ function renderCashflow() {
   }));
 
   store.belanja.forEach(x => feedItems.push({
-    _ts: new Date(x.date).getTime(), _typeKey: 'belanja',
+    _date: x.date, _ts: new Date(x.date).getTime(), _typeKey: 'belanja',
     icon: x.jenis === 'bahan' ? '🧵' : '🎨',
     label: x.desc,
     sub: `${new Date(x.date).toLocaleDateString('id-ID')} • ${x.jenis === 'bahan' ? 'Belanja Bahan' : 'Belanja Sablon'}`,
@@ -3671,7 +3729,7 @@ function renderCashflow() {
     const totalHpp = o.hpp?.totalHpp || 0;
     if (totalHpp <= 0) return;
     feedItems.push({
-      _ts: new Date(o.date).getTime(), _typeKey: 'invoice',
+      _date: o.date, _ts: new Date(o.date).getTime(), _typeKey: 'invoice',
       icon: '🧾',
       label: `HPP Produksi — ${o.invNo} (${o.customer})`,
       sub: `${new Date(o.date).toLocaleDateString('id-ID')} • ${o.product} • ${o.totalQty} pcs`,
@@ -3685,21 +3743,28 @@ function renderCashflow() {
   // Sort newest first
   feedItems.sort((a, b) => b._ts - a._ts);
 
-  // Filter by type
-  const filterType = document.getElementById('cf-filter-type')?.value || '';
-  let filteredItems = feedItems;
-  if (filterType === 'in') {
-    filteredItems = feedItems.filter(item => item._typeKey === 'in');
-  } else if (filterType === 'belanja') {
-    filteredItems = feedItems.filter(item => item._typeKey === 'belanja');
-  } else if (filterType === 'invoice') {
-    filteredItems = feedItems.filter(item => item._typeKey === 'invoice');
-  } else {
-    // Default: Pemasukan + Pengeluaran Belanja (tanpa invoice)
-    filteredItems = feedItems.filter(item => item._typeKey === 'in' || item._typeKey === 'belanja' || item._typeKey === 'hutang' || item._typeKey === 'piutang');
+  // Terapkan filter bulan (dari dropdown) ke SEMUA jenis item, bukan cuma kas,
+  // biar hutang/piutang/belanja/invoice ikut konsisten saat bulan tertentu dipilih.
+  let monthScopedItems = feedItems;
+  if (filterMonth) {
+    monthScopedItems = feedItems.filter(item => monthKeyOf(item._ts) === filterMonth);
   }
 
-  document.getElementById('cashflow-table').innerHTML = filteredItems.map(item => `
+  // Filter by type
+  const filterType = document.getElementById('cf-filter-type')?.value || '';
+  let filteredItems = monthScopedItems;
+  if (filterType === 'in') {
+    filteredItems = monthScopedItems.filter(item => item._typeKey === 'in');
+  } else if (filterType === 'belanja') {
+    filteredItems = monthScopedItems.filter(item => item._typeKey === 'belanja');
+  } else if (filterType === 'invoice') {
+    filteredItems = monthScopedItems.filter(item => item._typeKey === 'invoice');
+  } else {
+    // Default: Pemasukan + Pengeluaran Belanja (tanpa invoice)
+    filteredItems = monthScopedItems.filter(item => item._typeKey === 'in' || item._typeKey === 'belanja' || item._typeKey === 'hutang' || item._typeKey === 'piutang');
+  }
+
+  const cfItemHtml = item => `
     <div class="cf-item">
       <div style="font-size:20px;flex-shrink:0">${item.icon}</div>
       <div style="flex:1;min-width:0">
@@ -3711,7 +3776,57 @@ function renderCashflow() {
         <div class="${item.amountClass}" style="font-size:13px">${item.amountStr}</div>
         ${item.action}
       </div>
-    </div>`).join('');
+    </div>`;
+
+  if (filterMonth) {
+    // Bulan spesifik dipilih -> list flat seperti biasa
+    document.getElementById('cashflow-table').innerHTML = filteredItems.length
+      ? filteredItems.map(cfItemHtml).join('')
+      : '<div class="empty-state"><div class="empty-icon">💳</div><p>Belum ada transaksi bulan ini</p></div>';
+  } else {
+    // "Semua Bulan" -> kelompokkan per bulan, urut terbaru dulu, dengan perbandingan naik/turun
+    if (!filteredItems.length) {
+      document.getElementById('cashflow-table').innerHTML = '<div class="empty-state"><div class="empty-icon">💳</div><p>Belum ada transaksi</p></div>';
+    } else {
+      const groups = {};
+      filteredItems.forEach(item => {
+        const key = monthKeyOf(item._ts);
+        (groups[key] = groups[key] || []).push(item);
+      });
+      const sortedKeys = Object.keys(groups).sort().reverse();
+      document.getElementById('cashflow-table').innerHTML = sortedKeys.map((key, idx) => {
+        const group = groups[key];
+        const label = key === 'unknown' ? 'Tanpa Tanggal' : new Date(+key.split('-')[0], +key.split('-')[1]-1, 1).toLocaleDateString('id-ID', {month:'long', year:'numeric'});
+        const groupIn  = group.filter(i => i.amountClass === 'cf-in').reduce((a,i) => a + Math.abs(parseInt((i.amountStr||'').replace(/[^0-9]/g,''))||0), 0);
+        const groupOut = group.filter(i => i.amountClass === 'cf-out').reduce((a,i) => a + Math.abs(parseInt((i.amountStr||'').replace(/[^0-9]/g,''))||0), 0);
+        const netto = groupIn - groupOut;
+        const prevKey = sortedKeys[idx+1];
+        let trendHtml = '';
+        if (prevKey && prevKey !== 'unknown') {
+          const prevGroup = groups[prevKey];
+          const prevIn = prevGroup.filter(i => i.amountClass === 'cf-in').reduce((a,i) => a + Math.abs(parseInt((i.amountStr||'').replace(/[^0-9]/g,''))||0), 0);
+          if (prevIn > 0) {
+            const diffPct = ((groupIn - prevIn) / prevIn) * 100;
+            const cls = diffPct > 0.5 ? 'month-trend-up' : diffPct < -0.5 ? 'month-trend-down' : 'month-trend-flat';
+            const arrow = diffPct > 0.5 ? '▲' : diffPct < -0.5 ? '▼' : '▬';
+            trendHtml = `<span class="month-group-trend ${cls}">${arrow} ${Math.abs(diffPct).toFixed(0)}%</span>`;
+          } else if (groupIn > 0) {
+            trendHtml = `<span class="month-group-trend month-trend-up">▲ baru</span>`;
+          }
+        }
+        return `<div class="month-group">
+          <div class="month-group-header">
+            <div class="month-group-title">🗓️ ${label}</div>
+            <div class="month-group-stats">
+              <div style="color:var(--success)">Masuk ${fmtRp(groupIn)} ${trendHtml}</div>
+              <div style="color:var(--danger)">Keluar ${fmtRp(groupOut)}</div>
+            </div>
+          </div>
+          ${group.map(cfItemHtml).join('')}
+        </div>`;
+      }).join('');
+    }
+  }
   } catch(e) { console.error('renderCashflow error:', e); }
 }
 
