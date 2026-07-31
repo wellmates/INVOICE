@@ -680,6 +680,13 @@ body {
 }
 .modal-overlay.open .modal { transform: translateY(0); }
 .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+.floating-close-btn {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 14px;
+  z-index: 1001; width: 38px; height: 38px; border-radius: 50%;
+  background: var(--bg-card); border: 2px solid var(--border); box-shadow: var(--shadow-lg);
+  color: var(--text-secondary); font-size: 15px; font-weight: 700;
+  display: none; align-items: center; justify-content: center; cursor: pointer;
+}
 .modal-header {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
   position: sticky; top: 0; z-index: 5; background: var(--bg-card); padding: 4px 0 8px;
@@ -1758,6 +1765,9 @@ body {
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
+
+<!-- Fallback tombol kembali/tutup, selalu nempel di layar walau modal discroll -->
+<button type="button" class="floating-close-btn" id="floating-modal-close" onclick="closeTopModal()">✕</button>
 
 <script>
 // ===================================================
@@ -4942,8 +4952,26 @@ function renderDeadlines() {
 // ===================================================
 function fmt(n) { return new Intl.NumberFormat('id-ID').format(n); }
 function fmtRp(n) { return 'Rp' + new Intl.NumberFormat('id-ID').format(Math.round(n || 0)); }
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+let modalStack = [];
+function updateFloatingClose() {
+  const fc = document.getElementById('floating-modal-close');
+  if (fc) fc.style.display = modalStack.length ? 'flex' : 'none';
+}
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  modalStack = modalStack.filter(x => x !== id);
+  modalStack.push(id);
+  updateFloatingClose();
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  modalStack = modalStack.filter(x => x !== id);
+  updateFloatingClose();
+}
+function closeTopModal() {
+  const top = modalStack[modalStack.length - 1];
+  if (top) closeModal(top);
+}
 
 function toast(msg, type, duration) {
   type = type || "default"; duration = duration || 2500;
@@ -4960,7 +4988,7 @@ function toast(msg, type, duration) {
 
 // Close modal on overlay click
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay.id); });
 });
 
 // Payment status toggle
