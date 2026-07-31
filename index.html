@@ -680,7 +680,10 @@ body {
 }
 .modal-overlay.open .modal { transform: translateY(0); }
 .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
-.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+  position: sticky; top: 0; z-index: 5; background: var(--bg-card); padding: 4px 0 8px;
+}
 .modal-title { font-size: 16px; font-weight: 700; }
 
 /* ===================== TOGGLE THEME ===================== */
@@ -739,6 +742,25 @@ body {
 }
 .cutting-btn.active {
   border-color: var(--brand); background: var(--brand-light); color: var(--brand);
+}
+.cutting-group-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.cutting-group-tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 6px 6px 12px; border-radius: 999px;
+  border: 2px solid var(--border); background: var(--bg-card);
+  font-size: 12px; font-weight: 700; color: var(--text-secondary);
+  cursor: pointer; transition: all .15s; font-family: 'Inter', sans-serif;
+}
+.cutting-group-tab.active { border-color: var(--brand); background: var(--brand-light); color: var(--brand); }
+.cutting-group-tab .tab-remove {
+  width: 18px; height: 18px; border-radius: 50%; border: none;
+  background: rgba(0,0,0,.08); color: inherit; font-size: 11px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.cutting-group-add {
+  padding: 6px 12px; border-radius: 999px; border: 2px dashed var(--brand);
+  background: var(--brand-light); color: var(--brand); font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: 'Inter', sans-serif;
 }
 .produk-summary-bar {
   background: var(--brand-light); color: var(--brand);
@@ -965,6 +987,7 @@ body {
 
         <div id="cutting-section">
           <div class="card-title" style="margin-bottom:8px" id="cutting-label">Cutting Kaos</div>
+          <div class="cutting-group-tabs" id="cutting-group-tabs"></div>
           <div class="cutting-btns" id="cutting-btns"></div>
           <!-- Custom cutting input -->
           <div id="custom-cutting-wrap" style="display:none;margin-bottom:10px">
@@ -1452,6 +1475,7 @@ body {
     <!-- Size editor inside edit modal -->
     <div style="margin-top:10px">
       <div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">📐 Jumlah Per Ukuran</div>
+      <div class="cutting-group-tabs" id="edit-cutting-group-tabs"></div>
       <div id="edit-size-grid"></div>
     </div>
     <div id="edit-summary-box" style="margin-top:10px"></div>
@@ -2040,6 +2064,14 @@ let currentCutting = 'Reguler';
 let currentProdukCustom = '';
 let currentCuttingCustom = '';
 
+// --- MULTI-CUTTING GROUPS (order bisa punya lebih dari 1 pilihan cutting) ---
+let cuttingGroupCounter = 1;
+function newCuttingGroup(cutting) {
+  return { id: cuttingGroupCounter++, cutting: cutting || 'Reguler', cuttingCustom: '', qtys: {}, anak: {} };
+}
+let cuttingGroups = [ newCuttingGroup('Reguler') ];
+let activeGroupIdx = 0;
+
 function setProduk(produk, el) {
   currentProduk = produk;
   currentProdukCustom = '';
@@ -2049,6 +2081,7 @@ function setProduk(produk, el) {
   const customWrap = document.getElementById('custom-produk-wrap');
   if (customWrap) customWrap.style.display = 'none';
   document.getElementById('f-model').value = produk;
+  resetCuttingGroups();
   renderCuttingBtns();
   updateProdukSummary();
 }
@@ -2061,6 +2094,7 @@ function setProdukCustom(el) {
   const customWrap = document.getElementById('custom-produk-wrap');
   if (customWrap) customWrap.style.display = 'block';
   document.getElementById('f-model').value = currentProdukCustom || 'Custom';
+  resetCuttingGroups();
   renderCuttingBtns();
   updateProdukSummary();
 }
@@ -2071,18 +2105,155 @@ function onCustomProdukInput() {
   updateProdukSummary();
 }
 
-function renderCuttingBtns() {
-  currentCutting = 'Reguler';
-  currentCuttingCustom = '';
+function renderCuttingBtns(preserve) {
+  if (!preserve) {
+    currentCutting = 'Reguler';
+    currentCuttingCustom = '';
+  }
   document.getElementById('cutting-label').textContent = 'Cutting ' + (currentProdukCustom || currentProduk);
   const wrap = document.getElementById('cutting-btns');
   wrap.innerHTML = STANDARD_CUTS.map((c,i) =>
-    `<button class="cutting-btn${i===0?' active':''}" onclick="setCutting('${c}',this)">${c}</button>`
+    `<button class="cutting-btn${c===currentCutting?' active':''}" onclick="setCutting('${c}',this)">${c}</button>`
   ).join('');
-  // Ensure custom cutting input hidden by default
+  // Custom cutting input
   const ccw = document.getElementById('custom-cutting-wrap');
-  if (ccw) ccw.style.display = 'none';
+  if (ccw) ccw.style.display = currentCutting === 'Custom' ? 'block' : 'none';
+  const cci = document.getElementById('custom-cutting-input');
+  if (cci) cci.value = currentCuttingCustom || '';
   updateProdukSummary();
+}
+
+// ---- Cutting group tabs (untuk order dengan >1 pilihan cutting) ----
+function cuttingGroupLabel(g) {
+  return g.cutting === 'Custom' ? (g.cuttingCustom || 'Custom') : g.cutting;
+}
+function cuttingGroupQty(g, idx) {
+  if (idx === activeGroupIdx) {
+    return SIZES.reduce((a, s) => a + (parseInt(document.getElementById('qty-' + s.code)?.value || '0') || 0), 0);
+  }
+  return Object.values(g.qtys || {}).reduce((a, v) => a + (v || 0), 0);
+}
+function renderCuttingTabs() {
+  const wrap = document.getElementById('cutting-group-tabs');
+  if (!wrap) return;
+  const tabs = cuttingGroups.map((g, i) => {
+    const qty = cuttingGroupQty(g, i);
+    const removeBtn = cuttingGroups.length > 1
+      ? `<button type="button" class="tab-remove" onclick="event.stopPropagation();removeCuttingGroup(${i})">✕</button>` : '';
+    return `<div class="cutting-group-tab${i===activeGroupIdx?' active':''}" onclick="switchCuttingGroup(${i})">
+      <span>${cuttingGroupLabel(g)}${qty ? ' · '+qty : ''}</span>${removeBtn}
+    </div>`;
+  }).join('');
+  wrap.innerHTML = tabs + `<button type="button" class="cutting-group-add" onclick="addCuttingGroup()">+ Cutting</button>`;
+}
+function snapshotActiveGroup() {
+  const g = cuttingGroups[activeGroupIdx];
+  if (!g) return;
+  g.cutting = currentCutting;
+  g.cuttingCustom = currentCuttingCustom;
+  const qtys = {};
+  SIZES.forEach(s => {
+    const v = parseInt(document.getElementById('qty-' + s.code)?.value || '0') || 0;
+    if (v > 0) qtys[s.code] = v;
+  });
+  g.qtys = qtys;
+  g.anak = {
+    diffA: document.getElementById('anak-diff-A')?.value,
+    diffB: document.getElementById('anak-diff-B')?.value,
+    panjangA: document.getElementById('anak-panjang-A')?.value,
+    panjangB: document.getElementById('anak-panjang-B')?.value,
+    ribA: document.getElementById('anak-rib-A')?.value,
+    ribB: document.getElementById('anak-rib-B')?.value,
+  };
+}
+function loadGroupIntoUI(idx) {
+  const g = cuttingGroups[idx];
+  if (!g) return;
+  currentCutting = g.cutting;
+  currentCuttingCustom = g.cuttingCustom;
+  renderCuttingBtns(true);
+  renderSizeGrid();
+  Object.keys(g.qtys || {}).forEach(code => {
+    const el = document.getElementById('qty-' + code);
+    if (el) el.value = g.qtys[code];
+  });
+  const a = g.anak || {};
+  ['diffA','diffB','panjangA','panjangB','ribA','ribB'].forEach(k => {
+    const map = { diffA:'anak-diff-A', diffB:'anak-diff-B', panjangA:'anak-panjang-A', panjangB:'anak-panjang-B', ribA:'anak-rib-A', ribB:'anak-rib-B' };
+    if (a[k] !== undefined && a[k] !== '') {
+      const el = document.getElementById(map[k]);
+      if (el) el.value = a[k];
+    }
+  });
+  renderCuttingTabs();
+  recalculate();
+}
+function switchCuttingGroup(idx) {
+  if (idx === activeGroupIdx) return;
+  snapshotActiveGroup();
+  activeGroupIdx = idx;
+  loadGroupIntoUI(idx);
+}
+function addCuttingGroup() {
+  snapshotActiveGroup();
+  const used = cuttingGroups.map(g => g.cutting);
+  const nextDefault = STANDARD_CUTS.find(c => c !== 'Custom' && !used.includes(c)) || 'Reguler';
+  cuttingGroups.push(newCuttingGroup(nextDefault));
+  activeGroupIdx = cuttingGroups.length - 1;
+  loadGroupIntoUI(activeGroupIdx);
+}
+function removeCuttingGroup(idx) {
+  if (cuttingGroups.length <= 1) return;
+  cuttingGroups.splice(idx, 1);
+  if (activeGroupIdx >= cuttingGroups.length) activeGroupIdx = cuttingGroups.length - 1;
+  loadGroupIntoUI(activeGroupIdx);
+  toast('🗑️ Cutting dihapus dari order ini');
+}
+function resetCuttingGroups() {
+  cuttingGroups = [ newCuttingGroup('Reguler') ];
+  activeGroupIdx = 0;
+  renderCuttingTabs();
+}
+// Gabungkan qty semua cutting group jadi satu array sizes (masing-masing ditandai .cutting)
+function getAllGroupsSizeData() {
+  snapshotActiveGroup();
+  const combined = [];
+  cuttingGroups.forEach(g => {
+    const cuttingLabel = cuttingGroupLabel(g);
+    const a = g.anak || {};
+    const diffA = parseFloat(a.diffA), diffB = parseFloat(a.diffB);
+    const panjangA = parseFloat(a.panjangA), panjangB = parseFloat(a.panjangB);
+    const ribA = parseFloat(a.ribA), ribB = parseFloat(a.ribB);
+    SIZES.forEach(s => {
+      const qty = (g.qtys || {})[s.code] || 0;
+      if (qty <= 0) return;
+      let add = s.add;
+      let extra = {};
+      if (s.category === 'anak') {
+        const diff = s.tier === 'A' ? diffA : diffB;
+        const panjang = s.tier === 'A' ? panjangA : panjangB;
+        const rib = s.tier === 'A' ? ribA : ribB;
+        const resolvedDiff = !isNaN(diff) ? diff : -s.add;
+        const resolvedPanjang = !isNaN(panjang) ? panjang : KIDS_PANJANG_ADD_DEFAULT;
+        const resolvedRib = !isNaN(rib) ? rib : KIDS_RIB_ADD_DEFAULT;
+        const baseAdd = -resolvedDiff;
+        if (s.group === 'Normal') add = baseAdd;
+        else if (s.group === 'Panjang') add = baseAdd + resolvedPanjang;
+        else if (s.group === 'Panjang+Rib') add = baseAdd + resolvedRib;
+        extra = { tierDiff: resolvedDiff, tierPanjangAdd: resolvedPanjang, tierRibAdd: resolvedRib };
+      }
+      combined.push({ ...s, add, qty, cutting: cuttingLabel, ...extra });
+    });
+  });
+  return combined;
+}
+function buildModelCuttingLabel() {
+  snapshotActiveGroup();
+  const names = cuttingGroups
+    .filter(g => Object.values(g.qtys || {}).some(v => v > 0))
+    .map(g => cuttingGroupLabel(g));
+  const unique = [...new Set(names)];
+  return unique.length ? unique.join(', ') : getEffectiveCutting();
 }
 
 function setCutting(cutting, el) {
@@ -2093,11 +2264,20 @@ function setCutting(cutting, el) {
   const ccw = document.getElementById('custom-cutting-wrap');
   if (ccw) ccw.style.display = cutting === 'Custom' ? 'block' : 'none';
   updateProdukSummary();
+  if (cuttingGroups[activeGroupIdx]) {
+    cuttingGroups[activeGroupIdx].cutting = cutting;
+    cuttingGroups[activeGroupIdx].cuttingCustom = '';
+    renderCuttingTabs();
+  }
 }
 
 function onCustomCuttingInput() {
   currentCuttingCustom = document.getElementById('custom-cutting-input').value;
   updateProdukSummary();
+  if (cuttingGroups[activeGroupIdx]) {
+    cuttingGroups[activeGroupIdx].cuttingCustom = currentCuttingCustom;
+    renderCuttingTabs();
+  }
 }
 
 function getEffectiveProduk() {
@@ -2331,9 +2511,10 @@ function getHppBreakdown(baseHpp) {
 function recalculate() {
   const baseHpp = parseFloat(document.getElementById('f-base-hpp')?.value) || 0;
   const base = parseFloat(document.getElementById('f-base-price')?.value) || 0;
-  const sizes = getSizeData();
+  const sizes = getAllGroupsSizeData();
   const totalQty = sizes.reduce((a, s) => a + s.qty, 0);
   const totalRevenue = sizes.reduce((a, s) => a + (s.qty * (base + s.add)), 0);
+  renderCuttingTabs();
 
   // HPP modal preview
   const previewArea = document.getElementById('hpp-modal-preview-area');
@@ -2394,7 +2575,7 @@ function recalculate() {
 // INVOICE
 // ===================================================
 function getFormData() {
-  const sizes = getSizeData();
+  const sizes = getAllGroupsSizeData();
   const base = parseFloat(document.getElementById('f-base-price')?.value) || 0;
   const totalQty = sizes.reduce((a, s) => a + s.qty, 0);
   const totalRevenue = sizes.reduce((a, s) => a + s.qty * (base + s.add), 0);
@@ -2408,7 +2589,7 @@ function getFormData() {
     phone: document.getElementById('f-phone')?.value || '',
     address: document.getElementById('f-address')?.value || '',
     product: document.getElementById('f-product')?.value || '-',
-    model: getEffectiveProduk() + ' — Cutting ' + getEffectiveCutting(),
+    model: getEffectiveProduk() + ' — Cutting ' + buildModelCuttingLabel(),
     base, sizes, totalQty, totalRevenue, dp, payStatus, sisa,
     deadline: document.getElementById('f-deadline')?.value || '',
     notes: document.getElementById('f-notes')?.value || '',
@@ -2417,18 +2598,31 @@ function getFormData() {
   };
 }
 
+// Kalau order punya lebih dari 1 cutting, kelompokkan baris size per cutting.
+// Kalau cuma 1 (atau order lama tanpa tag cutting), balikin null supaya tampilan tetap seperti biasa.
+function groupSizesByCutting(sizes) {
+  const list = sizes || [];
+  const distinct = [...new Set(list.map(s => s.cutting).filter(Boolean))];
+  if (distinct.length <= 1) return null;
+  return distinct.map(name => ({ name, items: list.filter(s => s.cutting === name) }));
+}
+
 function buildA4Invoice(d) {
   const rowCount = d.sizes ? d.sizes.length : 0;
   // Scale font size down if many rows to fit 1 page
   const fs = rowCount <= 6 ? 12 : rowCount <= 10 ? 11 : rowCount <= 14 ? 10 : 9;
-  const rows = (d.sizes || []).map(s =>
-    `<tr>
+  const sizeRow = s => `<tr>
       <td style="font-weight:700;color:#0F172A;font-size:${fs}px">${s.label}</td>
       <td style="text-align:center;font-size:${fs}px">${s.qty}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:${fs}px">${fmtRp(d.base + s.add)}</td>
       <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:${fs}px;font-weight:700;color:#0F172A">${fmtRp(s.qty * (d.base + s.add))}</td>
-    </tr>`
-  ).join('');
+    </tr>`;
+  const cuttingGroupsForInvoice = groupSizesByCutting(d.sizes);
+  const rows = cuttingGroupsForInvoice
+    ? cuttingGroupsForInvoice.map(g => `
+        <tr><td colspan="4" style="background:#F1F5F9;font-size:${Math.max(fs-1,8)}px;font-weight:800;color:#1E1B4B;padding:4px 5px">✂️ Cutting ${g.name}</td></tr>
+        ${g.items.map(sizeRow).join('')}`).join('')
+    : (d.sizes || []).map(sizeRow).join('');
   const statusColor = d.payStatus === 'Lunas' ? '#059669' : d.payStatus === 'DP' ? '#D97706' : '#DC2626';
   const statusBg   = d.payStatus === 'Lunas' ? '#ECFDF5' : d.payStatus === 'DP' ? '#FFFBEB' : '#FEF2F2';
 
@@ -2571,9 +2765,11 @@ function buildA4Invoice(d) {
 }
 
 function buildThermalInvoice(d) {
-  const rows = d.sizes.map(s =>
-    `<div class="th-row"><span>${s.label} x${s.qty}</span><span>${fmtRp(s.qty*(d.base+s.add))}</span></div>`
-  ).join('');
+  const thermalSizeRow = s => `<div class="th-row"><span>${s.label} x${s.qty}</span><span>${fmtRp(s.qty*(d.base+s.add))}</span></div>`;
+  const thermalCuttingGroups = groupSizesByCutting(d.sizes);
+  const rows = thermalCuttingGroups
+    ? thermalCuttingGroups.map(g => `<div style="font-weight:700;font-size:10px;margin-top:4px">✂️ Cutting ${g.name}</div>${g.items.map(thermalSizeRow).join('')}`).join('')
+    : d.sizes.map(thermalSizeRow).join('');
   const sep = '================================';
   const sep2 = '--------------------------------';
 
@@ -2709,7 +2905,11 @@ function printDetailInvoice() {
 }
 
 function buildWAText(d) {
-  const rows = d.sizes.map(s => `  ${s.label}: ${s.qty} pcs = ${fmtRp(s.qty*(d.base+s.add))}`).join('\n');
+  const waSizeRow = s => `  ${s.label}: ${s.qty} pcs = ${fmtRp(s.qty*(d.base+s.add))}`;
+  const waCuttingGroups = groupSizesByCutting(d.sizes);
+  const rows = waCuttingGroups
+    ? waCuttingGroups.map(g => `  ✂️ Cutting ${g.name}:\n${g.items.map(waSizeRow).join('\n')}`).join('\n')
+    : d.sizes.map(waSizeRow).join('\n');
   const dpLine = d.payStatus === 'DP'
     ? `DP Dibayar  : ${fmtRp(d.dp)}\n*SISA TAGIHAN: ${fmtRp(d.sisa)}*\n`
     : '';
@@ -2893,6 +3093,7 @@ function clearForm() {
   if (cpw) { cpw.style.display = 'none'; }
   const cpi = document.getElementById('custom-produk-input');
   if (cpi) cpi.value = '';
+  resetCuttingGroups();
   renderCuttingBtns();
   updateProdukSummary();
   recalculate();
@@ -3230,6 +3431,161 @@ function submitAddDp() {
 // ===================================================
 // EDIT ORDER
 // ===================================================
+// --- MULTI-CUTTING GROUPS untuk edit order ---
+let editGroupCounter = 1;
+let editCuttingGroups = [];
+let editActiveGroupIdx = 0;
+
+function groupStateToSizesArray(g) {
+  const arr = [];
+  const qtys = g.qtys || {};
+  Object.keys(qtys).forEach(code => arr.push({ code, qty: qtys[code] }));
+  const addOv = g.addOverrides || {};
+  Object.keys(addOv).forEach(code => {
+    let entry = arr.find(x => x.code === code);
+    if (!entry) { entry = { code, qty: 0 }; arr.push(entry); }
+    entry.customAdd = addOv[code];
+  });
+  const a = g.anak || {};
+  const tagTier = (codes, diffKey, panjangKey, ribKey) => {
+    if (!codes.length) return;
+    let entry = arr.find(x => codes.includes(x.code));
+    if (!entry) { entry = { code: codes[0], qty: 0 }; arr.push(entry); }
+    if (a[diffKey] !== undefined && a[diffKey] !== '') entry.tierDiff = parseFloat(a[diffKey]);
+    if (a[panjangKey] !== undefined && a[panjangKey] !== '') entry.tierPanjangAdd = parseFloat(a[panjangKey]);
+    if (a[ribKey] !== undefined && a[ribKey] !== '') entry.tierRibAdd = parseFloat(a[ribKey]);
+  };
+  const kidsGroupA = SIZE_BASE_ANAK.filter(s => s.tier === 'A');
+  const kidsGroupB = SIZE_BASE_ANAK.filter(s => s.tier === 'B');
+  tagTier(kidsGroupA.flatMap(s => [s.code, s.code+'_P', s.code+'_PR']), 'diffA', 'panjangA', 'ribA');
+  tagTier(kidsGroupB.flatMap(s => [s.code, s.code+'_P', s.code+'_PR']), 'diffB', 'panjangB', 'ribB');
+  return arr;
+}
+
+function computeGroupSizeData(g, cuttingLabel) {
+  const qtys = g.qtys || {};
+  const addOv = g.addOverrides || {};
+  const a = g.anak || {};
+  const diffA = parseFloat(a.diffA), diffB = parseFloat(a.diffB);
+  const panjangA = parseFloat(a.panjangA), panjangB = parseFloat(a.panjangB);
+  const ribA = parseFloat(a.ribA), ribB = parseFloat(a.ribB);
+  return SIZES.map(s => {
+    const qty = qtys[s.code] || 0;
+    if (qty <= 0) return null;
+    if (s.category === 'anak') {
+      const diff = s.tier === 'A' ? diffA : diffB;
+      const panjang = s.tier === 'A' ? panjangA : panjangB;
+      const rib = s.tier === 'A' ? ribA : ribB;
+      const resolvedDiff = !isNaN(diff) ? diff : -s.add;
+      const resolvedPanjang = !isNaN(panjang) ? panjang : KIDS_PANJANG_ADD_DEFAULT;
+      const resolvedRib = !isNaN(rib) ? rib : KIDS_RIB_ADD_DEFAULT;
+      const baseAdd = -resolvedDiff;
+      let add = baseAdd;
+      if (s.group === 'Panjang') add = baseAdd + resolvedPanjang;
+      else if (s.group === 'Panjang+Rib') add = baseAdd + resolvedRib;
+      return { ...s, qty, add, tierDiff: resolvedDiff, tierPanjangAdd: resolvedPanjang, tierRibAdd: resolvedRib, cutting: cuttingLabel };
+    }
+    const baseCode = s.baseCode || s.code;
+    const customAdd = addOv[baseCode] != null ? addOv[baseCode] : s.add;
+    let effectiveAdd = customAdd;
+    if (s.group === 'Panjang') effectiveAdd = customAdd + 10000;
+    if (s.group === 'Panjang+Rib') effectiveAdd = customAdd + 15000;
+    return { ...s, qty, add: effectiveAdd, customAdd, cutting: cuttingLabel };
+  }).filter(Boolean);
+}
+
+function snapshotActiveEditGroup() {
+  const g = editCuttingGroups[editActiveGroupIdx];
+  if (!g) return;
+  const qtys = {};
+  SIZES.forEach(s => {
+    const v = parseInt(document.getElementById('eqty-' + s.code)?.value || '0') || 0;
+    if (v > 0) qtys[s.code] = v;
+  });
+  g.qtys = qtys;
+  const addOverrides = {};
+  SIZE_BASE.forEach(s => {
+    const el = document.getElementById('eadd-' + s.code);
+    if (el && el.value !== '') addOverrides[s.code] = parseFloat(el.value) || 0;
+  });
+  g.addOverrides = addOverrides;
+  g.anak = {
+    diffA: document.getElementById('eanak-diff-A')?.value,
+    diffB: document.getElementById('eanak-diff-B')?.value,
+    panjangA: document.getElementById('eanak-panjang-A')?.value,
+    panjangB: document.getElementById('eanak-panjang-B')?.value,
+    ribA: document.getElementById('eanak-rib-A')?.value,
+    ribB: document.getElementById('eanak-rib-B')?.value,
+  };
+}
+function loadEditGroupIntoUI(idx) {
+  const g = editCuttingGroups[idx];
+  if (!g) return;
+  renderEditSizeGrid({ sizes: groupStateToSizesArray(g) });
+  renderEditCuttingTabs();
+  recalcEditSizes();
+}
+function switchEditGroup(idx) {
+  if (idx === editActiveGroupIdx) return;
+  snapshotActiveEditGroup();
+  editActiveGroupIdx = idx;
+  loadEditGroupIntoUI(idx);
+}
+function addEditGroup() {
+  snapshotActiveEditGroup();
+  const used = editCuttingGroups.map(g => g.cutting);
+  const nextDefault = STANDARD_CUTS.find(c => c !== 'Custom' && !used.includes(c)) || ('Cutting ' + (editCuttingGroups.length + 1));
+  editCuttingGroups.push({ id: editGroupCounter++, cutting: nextDefault, qtys: {}, addOverrides: {}, anak: {} });
+  editActiveGroupIdx = editCuttingGroups.length - 1;
+  loadEditGroupIntoUI(editActiveGroupIdx);
+}
+function removeEditGroup(idx) {
+  if (editCuttingGroups.length <= 1) return;
+  editCuttingGroups.splice(idx, 1);
+  if (editActiveGroupIdx >= editCuttingGroups.length) editActiveGroupIdx = editCuttingGroups.length - 1;
+  loadEditGroupIntoUI(editActiveGroupIdx);
+  toast('🗑️ Cutting dihapus dari order ini');
+}
+function renameEditGroup(idx, newName) {
+  const name = (newName || '').trim() || 'Reguler';
+  if (editCuttingGroups[idx]) editCuttingGroups[idx].cutting = name;
+  renderEditCuttingTabs();
+}
+function editGroupQty(g, idx) {
+  if (idx === editActiveGroupIdx) {
+    return SIZES.reduce((a, s) => a + (parseInt(document.getElementById('eqty-' + s.code)?.value || '0') || 0), 0);
+  }
+  return Object.values(g.qtys || {}).reduce((a, v) => a + (v || 0), 0);
+}
+function renderEditCuttingTabs() {
+  const wrap = document.getElementById('edit-cutting-group-tabs');
+  if (!wrap) return;
+  const tabs = editCuttingGroups.map((g, i) => {
+    const qty = editGroupQty(g, i);
+    const removeBtn = editCuttingGroups.length > 1
+      ? `<button type="button" class="tab-remove" onclick="event.stopPropagation();removeEditGroup(${i})">✕</button>` : '';
+    return `<div class="cutting-group-tab${i===editActiveGroupIdx?' active':''}" onclick="switchEditGroup(${i})">
+      <input type="text" value="${g.cutting}" onclick="event.stopPropagation()" onchange="renameEditGroup(${i},this.value)" style="width:64px;border:none;background:transparent;font:inherit;color:inherit;font-weight:700;padding:0">
+      ${qty ? ' · '+qty : ''}${removeBtn}
+    </div>`;
+  }).join('');
+  wrap.innerHTML = tabs + `<button type="button" class="cutting-group-add" onclick="addEditGroup()">+ Cutting</button>`;
+}
+function getAllEditGroupsSizeData() {
+  snapshotActiveEditGroup();
+  const combined = [];
+  editCuttingGroups.forEach(g => combined.push(...computeGroupSizeData(g, g.cutting)));
+  return combined;
+}
+function buildEditModelCuttingLabel() {
+  snapshotActiveEditGroup();
+  const names = editCuttingGroups
+    .filter(g => Object.values(g.qtys || {}).some(v => v > 0))
+    .map(g => g.cutting);
+  const unique = [...new Set(names)];
+  return unique.length ? unique.join(', ') : (editCuttingGroups[0]?.cutting || 'Reguler');
+}
+
 function openEditOrder() {
   const o = currentDetailOrder;
   if (!o) return;
@@ -3244,8 +3600,46 @@ function openEditOrder() {
   document.getElementById('edit-dp').value = o.dp || '';
   document.getElementById('edit-dp-group').style.display = o.payStatus === 'DP' ? 'flex' : 'none';
   document.getElementById('edit-notes').value = o.notes || '';
-  renderEditSizeGrid(o);
-  recalcEditSizes();
+
+  // Bangun cutting group dari sizes order (order lama tanpa tag cutting jadi 1 grup 'Reguler')
+  const groupsMap = {};
+  const order = [];
+  (o.sizes || []).forEach(item => {
+    const key = item.cutting || 'Reguler';
+    if (!groupsMap[key]) { groupsMap[key] = []; order.push(key); }
+    groupsMap[key].push(item);
+  });
+  const keys = order.length ? order : ['Reguler'];
+  editCuttingGroups = keys.map(key => {
+    const items = groupsMap[key] || [];
+    const qtys = {}; const addOverrides = {};
+    items.forEach(it => { if (it.qty > 0) qtys[it.code] = it.qty; });
+    SIZE_BASE.forEach(s => {
+      const entry = items.find(x => x.code === s.code);
+      if (entry && entry.customAdd != null) addOverrides[s.code] = entry.customAdd;
+    });
+    const findTier = (codes, field, fallback) => {
+      for (const c of codes) { const e = items.find(x => x.code === c); if (e && e[field] != null) return e[field]; }
+      return fallback;
+    };
+    const kidsGroupA = SIZE_BASE_ANAK.filter(s => s.tier === 'A');
+    const kidsGroupB = SIZE_BASE_ANAK.filter(s => s.tier === 'B');
+    const allACodes = kidsGroupA.flatMap(s => [s.code, s.code+'_P', s.code+'_PR']);
+    const allBCodes = kidsGroupB.flatMap(s => [s.code, s.code+'_P', s.code+'_PR']);
+    const discA = (store.settings && store.settings.kidsDiscountA != null) ? store.settings.kidsDiscountA : 20000;
+    const discB = (store.settings && store.settings.kidsDiscountB != null) ? store.settings.kidsDiscountB : 10000;
+    const anak = {
+      diffA: findTier(allACodes, 'tierDiff', discA),
+      diffB: findTier(allBCodes, 'tierDiff', discB),
+      panjangA: findTier(allACodes, 'tierPanjangAdd', KIDS_PANJANG_ADD_DEFAULT),
+      panjangB: findTier(allBCodes, 'tierPanjangAdd', KIDS_PANJANG_ADD_DEFAULT),
+      ribA: findTier(allACodes, 'tierRibAdd', KIDS_RIB_ADD_DEFAULT),
+      ribB: findTier(allBCodes, 'tierRibAdd', KIDS_RIB_ADD_DEFAULT),
+    };
+    return { id: editGroupCounter++, cutting: key, qtys, addOverrides, anak };
+  });
+  editActiveGroupIdx = 0;
+  loadEditGroupIntoUI(0);
   openModal('edit-order-modal');
 }
 
@@ -3387,7 +3781,8 @@ function getEditSizeData() {
 function recalcEditSizes() {
   const base = parseFloat(document.getElementById('edit-base-price')?.value) || 0;
   const hpp  = parseFloat(document.getElementById('edit-base-hpp')?.value) || 0;
-  const sizes = getEditSizeData();
+  const sizes = getAllEditGroupsSizeData();
+  renderEditCuttingTabs();
   const totalQty     = sizes.reduce((a,s)=>a+s.qty,0);
   const totalRevenue = sizes.reduce((a,s)=>a+s.qty*(base+s.add),0);
   const totalHpp     = hpp * totalQty;
@@ -3414,7 +3809,8 @@ function saveEditOrder() {
   if (!customer) { toast('⚠️ Nama pelanggan wajib diisi!', 'warn'); return; }
   const base    = parseFloat(document.getElementById('edit-base-price').value) || o.base;
   const baseHpp = parseFloat(document.getElementById('edit-base-hpp').value) || o.baseHpp || 0;
-  const sizes   = getEditSizeData();
+  const sizes   = getAllEditGroupsSizeData();
+  const newModel = (o.model || '').split(' — Cutting ')[0] + ' — Cutting ' + buildEditModelCuttingLabel();
   const totalQty     = sizes.reduce((a,s)=>a+s.qty,0);
   const totalRevenue = sizes.reduce((a,s)=>a+s.qty*(base+s.add),0);
   const payStatus = document.getElementById('edit-pay-status').value;
@@ -3496,6 +3892,7 @@ function saveEditOrder() {
     deadline: document.getElementById('edit-deadline').value,
     address:  document.getElementById('edit-address').value,
     product:  document.getElementById('edit-product').value,
+    model:    sizes.length > 0 ? newModel : o.model,
     base,
     baseHpp,
     sizes:        sizes.length > 0 ? sizes : o.sizes,
@@ -4811,6 +5208,7 @@ try { loadTheme(); } catch(e) {}
 try { syncThemePicker(); } catch(e) {}
 try { renderSizeGrid(); } catch(e) { console.error('renderSizeGrid error:', e); }
 try { renderCuttingBtns(); } catch(e) {}
+try { renderCuttingTabs(); } catch(e) {}
 try { updateProdukSummary(); } catch(e) {}
 try { populateDashYearSelect(); } catch(e) {}
 try { renderDashboard(); } catch(e) { console.error('renderDashboard init error:', e); }
