@@ -807,6 +807,15 @@ body {
 
 /* Print type selector */
 .print-type-btns { display: flex; gap: 8px; margin-bottom: 14px; }
+.history-tabs {
+  display: flex; gap: 6px; background: var(--bg-input); border-radius: 10px; padding: 4px; margin-bottom: 10px;
+}
+.history-tab-btn {
+  flex: 1; text-align: center; padding: 9px 8px; border-radius: 8px; border: none;
+  background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 700;
+  font-family: 'Inter', sans-serif; cursor: pointer; transition: all .15s;
+}
+.history-tab-btn.active { background: var(--bg-card); color: var(--brand); box-shadow: var(--shadow-sm); }
 .print-type-btn {
   flex: 1; padding: 10px 6px; border-radius: var(--radius-sm); cursor: pointer;
   border: 2px solid var(--border); background: var(--bg-card);
@@ -1113,6 +1122,10 @@ body {
           <option value="DP">DP</option>
           <option value="Lunas">Lunas</option>
         </select>
+      </div>
+      <div class="history-tabs" id="history-tabs">
+        <button type="button" class="history-tab-btn" id="history-tab-proses" onclick="setHistoryTab('proses')">🔄 Proses</button>
+        <button type="button" class="history-tab-btn" id="history-tab-selesai" onclick="setHistoryTab('selesai')">✅ Selesai</button>
       </div>
       <!-- Filter Bulan -->
       <select id="filter-month" onchange="renderHistory()" style="width:100%;padding:10px 12px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:13px;outline:none;-webkit-appearance:none;margin-bottom:10px;font-family:'Inter',sans-serif">
@@ -3145,6 +3158,19 @@ function populateMonthFilter() {
     }).join('');
 }
 
+let historyTab = 'proses';
+function isOrderSelesai(o) {
+  if (!o) return false;
+  if (o.payStatus !== 'Lunas') return false;
+  if (!o.deadline) return false;
+  return new Date(o.deadline) < new Date();
+}
+function setHistoryTab(tab) {
+  historyTab = tab;
+  document.getElementById('history-tab-proses')?.classList.toggle('active', tab === 'proses');
+  document.getElementById('history-tab-selesai')?.classList.toggle('active', tab === 'selesai');
+  renderHistory();
+}
 function renderHistory() {
   try { populateMonthFilter(); } catch(e) {}
   const list = document.getElementById('history-list');
@@ -3155,6 +3181,13 @@ function renderHistory() {
     const filterMonth = document.getElementById('filter-month')?.value || '';
     let orders = [...(store.orders || [])].reverse();
     orders = orders.filter(o => o && o.id);
+    const prosesCount = orders.filter(o => !isOrderSelesai(o)).length;
+    const selesaiCount = orders.filter(o => isOrderSelesai(o)).length;
+    const tabProsesEl = document.getElementById('history-tab-proses');
+    const tabSelesaiEl = document.getElementById('history-tab-selesai');
+    if (tabProsesEl) { tabProsesEl.textContent = `🔄 Proses (${prosesCount})`; tabProsesEl.classList.toggle('active', historyTab==='proses'); }
+    if (tabSelesaiEl) { tabSelesaiEl.textContent = `✅ Selesai (${selesaiCount})`; tabSelesaiEl.classList.toggle('active', historyTab==='selesai'); }
+    orders = orders.filter(o => historyTab === 'selesai' ? isOrderSelesai(o) : !isOrderSelesai(o));
     if (search) orders = orders.filter(o =>
       (o.customer||'').toLowerCase().includes(search) ||
       (o.product||'').toLowerCase().includes(search) ||
@@ -3166,7 +3199,9 @@ function renderHistory() {
       orders = orders.filter(o => { try { const d = new Date(o.date); return d.getFullYear()===fy && d.getMonth()+1===fm; } catch(e){ return false; } });
     }
     if (!orders.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada order tersimpan</p></div>';
+      list.innerHTML = historyTab === 'selesai'
+        ? '<div class="empty-state"><div class="empty-icon">✅</div><p>Belum ada order yang selesai (lewat deadline &amp; lunas)</p></div>'
+        : '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada order yang sedang diproses</p></div>';
       return;
     }
     const orderCardHtml = o => {
