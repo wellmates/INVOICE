@@ -1478,7 +1478,7 @@ body {
       </div>
       <div class="form-group">
         <label>Harga Jual Dasar S–XL / pcs <span style="font-weight:400;color:var(--text-muted)">— khusus tab cutting yang aktif</span></label>
-        <input type="number" inputmode="numeric" id="edit-base-price" placeholder="75000" oninput="recalcEditSizes()">
+        <input type="number" inputmode="numeric" id="edit-base-price" placeholder="75000" oninput="onEditBaseChange()">
       </div>
       <div class="form-group">
         <label>HPP / pcs (Rp)</label>
@@ -3606,14 +3606,15 @@ function snapshotActiveEditGroup() {
     if (v > 0) qtys[s.code] = v;
   });
   g.qtys = qtys;
+  const baseVal = parseFloat(g.basePrice) || 0;
   const addOverrides = {};
   SIZE_BASE.forEach(s => {
-    const el = document.getElementById('eadd-' + s.code);
-    if (el && el.value !== '') addOverrides[s.code] = parseFloat(el.value) || 0;
-    const elP = document.getElementById('eadd-' + s.code + '_P');
-    if (elP && elP.value !== '') addOverrides[s.code + '_P'] = parseFloat(elP.value) || 0;
-    const elPR = document.getElementById('eadd-' + s.code + '_PR');
-    if (elPR && elPR.value !== '') addOverrides[s.code + '_PR'] = parseFloat(elPR.value) || 0;
+    const el = document.getElementById('eprice-' + s.code);
+    if (el && el.value !== '') addOverrides[s.code] = (parseFloat(el.value) || 0) - baseVal;
+    const elP = document.getElementById('eprice-' + s.code + '_P');
+    if (elP && elP.value !== '') addOverrides[s.code + '_P'] = (parseFloat(elP.value) || 0) - baseVal;
+    const elPR = document.getElementById('eprice-' + s.code + '_PR');
+    if (elPR && elPR.value !== '') addOverrides[s.code + '_PR'] = (parseFloat(elPR.value) || 0) - baseVal;
   });
   g.addOverrides = addOverrides;
   g.anak = {
@@ -3722,15 +3723,21 @@ function openEditOrder() {
   const keys = order.length ? order : ['Reguler'];
   editCuttingGroups = keys.map(key => {
     const items = groupsMap[key] || [];
+    const groupBaseEntry = items.find(it => it.groupBase != null);
+    const basePrice = groupBaseEntry ? groupBaseEntry.groupBase : (o.base ?? '');
+    const baseValForOverride = parseFloat(basePrice) || 0;
     const qtys = {}; const addOverrides = {};
     items.forEach(it => { if (it.qty > 0) qtys[it.code] = it.qty; });
     SIZE_BASE.forEach(s => {
+      // Selisih dihitung dari harga yang BENERAN kepakai (unitPrice, hormati groupBase per-item kalau ada
+      // dari data lama) dikurangi harga dasar yang dipakai form ini — supaya harga akhir yang kebaca
+      // di kotak edit selalu sama persis dengan yang tampil di invoice, apapun bentuk data lamanya.
       const entry = items.find(x => x.code === s.code);
-      if (entry && entry.customAdd != null) addOverrides[s.code] = entry.customAdd;
+      if (entry) addOverrides[s.code] = unitPrice(entry, o.base) - baseValForOverride;
       const entryP = items.find(x => x.code === s.code + '_P');
-      if (entryP) addOverrides[s.code + '_P'] = entryP.customAdd != null ? entryP.customAdd : entryP.add;
+      if (entryP) addOverrides[s.code + '_P'] = unitPrice(entryP, o.base) - baseValForOverride;
       const entryPR = items.find(x => x.code === s.code + '_PR');
-      if (entryPR) addOverrides[s.code + '_PR'] = entryPR.customAdd != null ? entryPR.customAdd : entryPR.add;
+      if (entryPR) addOverrides[s.code + '_PR'] = unitPrice(entryPR, o.base) - baseValForOverride;
     });
     const findTier = (codes, field, fallback) => {
       for (const c of codes) { const e = items.find(x => x.code === c); if (e && e[field] != null) return e[field]; }
@@ -3750,8 +3757,6 @@ function openEditOrder() {
       ribA: findTier(allACodes, 'tierRibAdd', KIDS_RIB_ADD_DEFAULT),
       ribB: findTier(allBCodes, 'tierRibAdd', KIDS_RIB_ADD_DEFAULT),
     };
-    const groupBaseEntry = items.find(it => it.groupBase != null);
-    const basePrice = groupBaseEntry ? groupBaseEntry.groupBase : (o.base ?? '');
     return { id: editGroupCounter++, cutting: key, basePrice, qtys, addOverrides, anak };
   });
   editActiveGroupIdx = 0;
@@ -3764,8 +3769,30 @@ function toggleEditDp() {
   document.getElementById('edit-dp-group').style.display = v === 'DP' ? 'flex' : 'none';
 }
 
+function onEditBaseChange() {
+  // Simpan dulu selisih harga tiap size (relatif ke harga dasar LAMA) sebelum harga dasar berubah,
+  // supaya kotak harga per size ikut ter-update ke harga dasar baru tanpa kehilangan selisihnya.
+  const g = editCuttingGroups[editActiveGroupIdx];
+  if (g) {
+    const oldBase = parseFloat(g.basePrice) || 0;
+    const addOverrides = {};
+    SIZE_BASE.forEach(s => {
+      const el = document.getElementById('eprice-' + s.code);
+      if (el && el.value !== '') addOverrides[s.code] = (parseFloat(el.value) || 0) - oldBase;
+      const elP = document.getElementById('eprice-' + s.code + '_P');
+      if (elP && elP.value !== '') addOverrides[s.code + '_P'] = (parseFloat(elP.value) || 0) - oldBase;
+      const elPR = document.getElementById('eprice-' + s.code + '_PR');
+      if (elPR && elPR.value !== '') addOverrides[s.code + '_PR'] = (parseFloat(elPR.value) || 0) - oldBase;
+    });
+    g.addOverrides = addOverrides;
+    g.basePrice = document.getElementById('edit-base-price')?.value ?? '';
+    renderEditSizeGrid({ sizes: groupStateToSizesArray(g) });
+  }
+  recalcEditSizes();
+}
 function renderEditSizeGrid(o) {
   const wrap = document.getElementById('edit-size-grid');
+  const baseVal = parseFloat(document.getElementById('edit-base-price')?.value) || 0;
   let rows = '';
   SIZE_BASE.forEach(s => {
     const entryN  = o.sizes.find(x=>x.code===s.code);
@@ -3774,23 +3801,24 @@ function renderEditSizeGrid(o) {
     const qN  = entryN?.qty  || 0;
     const qP  = entryP?.qty  || 0;
     const qPR = entryPR?.qty || 0;
-    // Harga tambahan (add) tiap varian disimpan terpisah per size — tidak lagi dipaksa base+konstanta
-    const customAdd   = entryN?.customAdd  ?? s.add;
-    const customAddP  = entryP?.customAdd  ?? (customAdd + PANJANG_ADD);
-    const customAddPR = entryPR?.customAdd ?? (customAdd + PANJANG_RIB_ADD);
+    // Harga per pcs ditampilkan APA ADANYA (harga dasar + selisih yang sudah di-resolve di openEditOrder),
+    // bukan direkonstruksi dari rumus "+tambahan" — supaya nggak ada lagi salah hitung waktu size lama disave ulang.
+    const priceN  = baseVal + (entryN?.customAdd  ?? s.add);
+    const priceP  = baseVal + (entryP?.customAdd  ?? (s.add + PANJANG_ADD));
+    const pricePR = baseVal + (entryPR?.customAdd ?? (s.add + PANJANG_RIB_ADD));
     rows += `<tr>
       <td style="font-size:12px;font-weight:700;padding:3px 0;width:36px">${s.label}</td>
       <td>
         <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}" value="${qN||''}" oninput="recalcEditSizes()">
-        <input class="size-price-mini" type="number" inputmode="numeric" id="eadd-${s.code}" value="${customAdd||''}" oninput="recalcEditSizes()" title="Tambahan harga Pendek ${s.label}">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="eprice-${s.code}" value="${priceN||''}" oninput="recalcEditSizes()" title="Harga akhir per pcs — Pendek ${s.label}">
       </td>
       <td>
         <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}_P" value="${qP||''}" oninput="recalcEditSizes()">
-        <input class="size-price-mini" type="number" inputmode="numeric" id="eadd-${s.code}_P" value="${customAddP||''}" oninput="recalcEditSizes()" title="Tambahan harga Panjang ${s.label}">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="eprice-${s.code}_P" value="${priceP||''}" oninput="recalcEditSizes()" title="Harga akhir per pcs — Panjang ${s.label}">
       </td>
       <td>
         <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}_PR" value="${qPR||''}" oninput="recalcEditSizes()">
-        <input class="size-price-mini" type="number" inputmode="numeric" id="eadd-${s.code}_PR" value="${customAddPR||''}" oninput="recalcEditSizes()" title="Tambahan harga Pjg+Rib ${s.label}">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="eprice-${s.code}_PR" value="${pricePR||''}" oninput="recalcEditSizes()" title="Harga akhir per pcs — Pjg+Rib ${s.label}">
       </td>
     </tr>`;
   });
@@ -3857,7 +3885,7 @@ function renderEditSizeGrid(o) {
       <th style="text-align:left;padding-left:0">Ukur</th>
       <th>Pendek</th><th>Panjang</th><th>Pjg+Rib</th>
     </tr></thead><tbody>${rows}</tbody></table>
-    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">💡 Kotak kecil putus-putus di bawah qty = harga tambahan ukuran itu, dan sekarang tiap varian (Pendek/Panjang/Pjg+Rib) bisa diatur sendiri-sendiri, tidak lagi otomatis dipaksa +${fmt(PANJANG_ADD)}rb/+${fmt(PANJANG_RIB_ADD)}rb dari ukuran pendek</div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">💡 Kotak kecil putus-putus di bawah qty = harga akhir per pcs untuk varian itu (bukan tambahan lagi) — tinggal ubah langsung angkanya kalau salah, nanti otomatis kesimpen persis segitu</div>
     <div class="size-group-title" style="margin-top:14px">👶 Ukuran Anak</div>
     <div style="font-size:12px;font-weight:700;color:var(--text-secondary)">Size 2–8 Thn</div>
     ${kidsTierControls('A', eDiscA, ePanjangA, eRibA)}
