@@ -804,6 +804,14 @@ body {
   font-size: 14px; outline: none; font-family: 'JetBrains Mono', monospace;
 }
 .size-qty-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 2px rgba(79,70,229,.1); }
+.size-price-mini {
+  width: 100%; text-align: center; padding: 3px 2px; margin-top: 3px;
+  border: 1px dashed var(--border); border-radius: 5px;
+  background: transparent; color: var(--brand);
+  font-size: 10px; outline: none; font-family: 'JetBrains Mono', monospace;
+}
+.size-price-mini:focus { border-color: var(--border-focus); border-style: solid; }
+.size-price-mini::placeholder { color: var(--text-muted); }
 
 /* Print type selector */
 .print-type-btns { display: flex; gap: 8px; margin-bottom: 14px; }
@@ -2098,7 +2106,7 @@ let currentCuttingCustom = '';
 // --- MULTI-CUTTING GROUPS (order bisa punya lebih dari 1 pilihan cutting) ---
 let cuttingGroupCounter = 1;
 function newCuttingGroup(cutting) {
-  return { id: cuttingGroupCounter++, cutting: cutting || 'Reguler', cuttingCustom: '', basePrice: '', qtys: {}, anak: {} };
+  return { id: cuttingGroupCounter++, cutting: cutting || 'Reguler', cuttingCustom: '', basePrice: '', qtys: {}, addOverrides: {}, anak: {} };
 }
 let cuttingGroups = [ newCuttingGroup('Reguler') ];
 let activeGroupIdx = 0;
@@ -2189,6 +2197,14 @@ function snapshotActiveGroup() {
     if (v > 0) qtys[s.code] = v;
   });
   g.qtys = qtys;
+  const addOverrides = {};
+  SIZE_BASE.forEach(s => {
+    const elP = document.getElementById('add-' + s.code + '_P');
+    if (elP && elP.value !== '') addOverrides[s.code + '_P'] = parseFloat(elP.value) || 0;
+    const elPR = document.getElementById('add-' + s.code + '_PR');
+    if (elPR && elPR.value !== '') addOverrides[s.code + '_PR'] = parseFloat(elPR.value) || 0;
+  });
+  g.addOverrides = addOverrides;
   g.anak = {
     diffA: document.getElementById('anak-diff-A')?.value,
     diffB: document.getElementById('anak-diff-B')?.value,
@@ -2210,6 +2226,11 @@ function loadGroupIntoUI(idx) {
   Object.keys(g.qtys || {}).forEach(code => {
     const el = document.getElementById('qty-' + code);
     if (el) el.value = g.qtys[code];
+  });
+  const addOv = g.addOverrides || {};
+  Object.keys(addOv).forEach(code => {
+    const el = document.getElementById('add-' + code);
+    if (el) el.value = addOv[code];
   });
   const a = g.anak || {};
   ['diffA','diffB','panjangA','panjangB','ribA','ribB'].forEach(k => {
@@ -2258,6 +2279,7 @@ function getAllGroupsSizeData() {
   cuttingGroups.forEach(g => {
     const cuttingLabel = cuttingGroupLabel(g);
     const groupBase = parseFloat(g.basePrice);
+    const addOv = g.addOverrides || {};
     const a = g.anak || {};
     const diffA = parseFloat(a.diffA), diffB = parseFloat(a.diffB);
     const panjangA = parseFloat(a.panjangA), panjangB = parseFloat(a.panjangB);
@@ -2279,6 +2301,10 @@ function getAllGroupsSizeData() {
         else if (s.group === 'Panjang') add = baseAdd + resolvedPanjang;
         else if (s.group === 'Panjang+Rib') add = baseAdd + resolvedRib;
         extra = { tierDiff: resolvedDiff, tierPanjangAdd: resolvedPanjang, tierRibAdd: resolvedRib };
+      } else {
+        // Harga tambahan custom per size (khusus varian Panjang / Pjg+Rib), fallback ke default constant
+        const ov = addOv[s.code];
+        if (ov != null) { add = ov; extra.customAdd = ov; }
       }
       combined.push({ ...s, add, qty, cutting: cuttingLabel, groupBase: isNaN(groupBase) ? null : groupBase, ...extra });
     });
@@ -2343,8 +2369,8 @@ function renderSizeGrid() {
       <tr>
         <th style="text-align:left;padding-left:0">Ukuran</th>
         <th>Pendek</th>
-        <th>Panjang<br><span style="color:var(--brand);font-weight:700">+10rb/pcs</span></th>
-        <th>Pjg+Rib<br><span style="color:var(--brand);font-weight:700">+15rb/pcs</span></th>
+        <th>Panjang<br><span style="color:var(--brand);font-weight:700">mulai +${fmt(PANJANG_ADD)}rb</span></th>
+        <th>Pjg+Rib<br><span style="color:var(--brand);font-weight:700">mulai +${fmt(PANJANG_RIB_ADD)}rb</span></th>
       </tr>
     </thead>`;
 
@@ -2359,8 +2385,14 @@ function renderSizeGrid() {
         </div>
       </td>
       <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}" oninput="recalculate()"></td>
-      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_P" oninput="recalculate()"></td>
-      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_PR" oninput="recalculate()"></td>
+      <td>
+        <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_P" oninput="recalculate()">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="add-${s.code}_P" placeholder="+${fmt(PANJANG_ADD)}rb" oninput="recalculate()" title="Harga tambahan khusus Panjang ${s.label} — kosongkan utk default">
+      </td>
+      <td>
+        <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_PR" oninput="recalculate()">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="add-${s.code}_PR" placeholder="+${fmt(PANJANG_RIB_ADD)}rb" oninput="recalculate()" title="Harga tambahan khusus Pjg+Rib ${s.label} — kosongkan utk default">
+      </td>
     </tr>`;
   });
 
@@ -2410,6 +2442,7 @@ function renderSizeGrid() {
 
   container.innerHTML = `
     <table class="size-table-wrap">${colHeaders}<tbody>${rows}</tbody></table>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">💡 Kotak kecil putus-putus di bawah qty Panjang / Pjg+Rib = harga tambahan custom per ukuran (kosongkan kalau pakai default)</div>
     <div class="size-group-title" style="margin-top:14px">👶 Ukuran Anak</div>
     ${kidsTierBlock('Size 2 – 8 Thn', 'A', discA, KIDS_PANJANG_ADD_DEFAULT, KIDS_RIB_ADD_DEFAULT, kidsGroupA)}
     ${kidsTierBlock('Size 10 – 14 Thn', 'B', discB, KIDS_PANJANG_ADD_DEFAULT, KIDS_RIB_ADD_DEFAULT, kidsGroupB)}
@@ -3547,11 +3580,19 @@ function computeGroupSizeData(g, cuttingLabel) {
       return { ...s, qty, add, tierDiff: resolvedDiff, tierPanjangAdd: resolvedPanjang, tierRibAdd: resolvedRib, cutting: cuttingLabel, groupBase: isNaN(groupBase) ? null : groupBase };
     }
     const baseCode = s.baseCode || s.code;
-    const customAdd = addOv[baseCode] != null ? addOv[baseCode] : s.add;
-    let effectiveAdd = customAdd;
-    if (s.group === 'Panjang') effectiveAdd = customAdd + 10000;
-    if (s.group === 'Panjang+Rib') effectiveAdd = customAdd + 15000;
-    return { ...s, qty, add: effectiveAdd, customAdd, cutting: cuttingLabel, groupBase: isNaN(groupBase) ? null : groupBase };
+    const baseOverride = addOv[baseCode];
+    const ownOverride = addOv[s.code]; // harga khusus varian ini (Pendek/Panjang/Pjg+Rib), kalau ada
+    let effectiveAdd;
+    if (ownOverride != null) {
+      effectiveAdd = ownOverride;
+    } else if (s.group === 'Panjang') {
+      effectiveAdd = (baseOverride != null ? baseOverride : (s.add - PANJANG_ADD)) + PANJANG_ADD;
+    } else if (s.group === 'Panjang+Rib') {
+      effectiveAdd = (baseOverride != null ? baseOverride : (s.add - PANJANG_RIB_ADD)) + PANJANG_RIB_ADD;
+    } else {
+      effectiveAdd = baseOverride != null ? baseOverride : s.add;
+    }
+    return { ...s, qty, add: effectiveAdd, customAdd: effectiveAdd, cutting: cuttingLabel, groupBase: isNaN(groupBase) ? null : groupBase };
   }).filter(Boolean);
 }
 
@@ -3569,6 +3610,10 @@ function snapshotActiveEditGroup() {
   SIZE_BASE.forEach(s => {
     const el = document.getElementById('eadd-' + s.code);
     if (el && el.value !== '') addOverrides[s.code] = parseFloat(el.value) || 0;
+    const elP = document.getElementById('eadd-' + s.code + '_P');
+    if (elP && elP.value !== '') addOverrides[s.code + '_P'] = parseFloat(elP.value) || 0;
+    const elPR = document.getElementById('eadd-' + s.code + '_PR');
+    if (elPR && elPR.value !== '') addOverrides[s.code + '_PR'] = parseFloat(elPR.value) || 0;
   });
   g.addOverrides = addOverrides;
   g.anak = {
@@ -3682,6 +3727,10 @@ function openEditOrder() {
     SIZE_BASE.forEach(s => {
       const entry = items.find(x => x.code === s.code);
       if (entry && entry.customAdd != null) addOverrides[s.code] = entry.customAdd;
+      const entryP = items.find(x => x.code === s.code + '_P');
+      if (entryP) addOverrides[s.code + '_P'] = entryP.customAdd != null ? entryP.customAdd : entryP.add;
+      const entryPR = items.find(x => x.code === s.code + '_PR');
+      if (entryPR) addOverrides[s.code + '_PR'] = entryPR.customAdd != null ? entryPR.customAdd : entryPR.add;
     });
     const findTier = (codes, field, fallback) => {
       for (const c of codes) { const e = items.find(x => x.code === c); if (e && e[field] != null) return e[field]; }
@@ -3719,17 +3768,30 @@ function renderEditSizeGrid(o) {
   const wrap = document.getElementById('edit-size-grid');
   let rows = '';
   SIZE_BASE.forEach(s => {
-    const qN  = (o.sizes.find(x=>x.code===s.code)?.qty)||0;
-    const qP  = (o.sizes.find(x=>x.code===s.code+'_P')?.qty)||0;
-    const qPR = (o.sizes.find(x=>x.code===s.code+'_PR')?.qty)||0;
-    // Custom add-on price: stored per size or fallback to default
-    const customAdd = o.sizes.find(x=>x.code===s.code)?.customAdd ?? s.add;
+    const entryN  = o.sizes.find(x=>x.code===s.code);
+    const entryP  = o.sizes.find(x=>x.code===s.code+'_P');
+    const entryPR = o.sizes.find(x=>x.code===s.code+'_PR');
+    const qN  = entryN?.qty  || 0;
+    const qP  = entryP?.qty  || 0;
+    const qPR = entryPR?.qty || 0;
+    // Harga tambahan (add) tiap varian disimpan terpisah per size — tidak lagi dipaksa base+konstanta
+    const customAdd   = entryN?.customAdd  ?? s.add;
+    const customAddP  = entryP?.customAdd  ?? (customAdd + PANJANG_ADD);
+    const customAddPR = entryPR?.customAdd ?? (customAdd + PANJANG_RIB_ADD);
     rows += `<tr>
       <td style="font-size:12px;font-weight:700;padding:3px 0;width:36px">${s.label}</td>
-      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}" value="${qN||''}" oninput="recalcEditSizes()"></td>
-      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}_P" value="${qP||''}" oninput="recalcEditSizes()"></td>
-      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}_PR" value="${qPR||''}" oninput="recalcEditSizes()"></td>
-      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="+0" id="eadd-${s.code}" value="${customAdd||''}" oninput="recalcEditSizes()" title="Tambahan harga ukuran ${s.label} vs dasar" style="color:var(--accent)"></td>
+      <td>
+        <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}" value="${qN||''}" oninput="recalcEditSizes()">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="eadd-${s.code}" value="${customAdd||''}" oninput="recalcEditSizes()" title="Tambahan harga Pendek ${s.label}">
+      </td>
+      <td>
+        <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}_P" value="${qP||''}" oninput="recalcEditSizes()">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="eadd-${s.code}_P" value="${customAddP||''}" oninput="recalcEditSizes()" title="Tambahan harga Panjang ${s.label}">
+      </td>
+      <td>
+        <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="eqty-${s.code}_PR" value="${qPR||''}" oninput="recalcEditSizes()">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="eadd-${s.code}_PR" value="${customAddPR||''}" oninput="recalcEditSizes()" title="Tambahan harga Pjg+Rib ${s.label}">
+      </td>
     </tr>`;
   });
   function findTierDiscount(tierCodes, fallback) {
@@ -3793,9 +3855,9 @@ function renderEditSizeGrid(o) {
   wrap.innerHTML = `<table class="size-table-wrap">
     <thead><tr>
       <th style="text-align:left;padding-left:0">Ukur</th>
-      <th>Pendek</th><th>Panjang</th><th>Pjg+Rib</th><th style="color:var(--accent)">+Harga</th>
+      <th>Pendek</th><th>Panjang</th><th>Pjg+Rib</th>
     </tr></thead><tbody>${rows}</tbody></table>
-    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">💡 +Harga = selisih harga ukuran ini vs harga dasar</div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:4px">💡 Kotak kecil putus-putus di bawah qty = harga tambahan ukuran itu, dan sekarang tiap varian (Pendek/Panjang/Pjg+Rib) bisa diatur sendiri-sendiri, tidak lagi otomatis dipaksa +${fmt(PANJANG_ADD)}rb/+${fmt(PANJANG_RIB_ADD)}rb dari ukuran pendek</div>
     <div class="size-group-title" style="margin-top:14px">👶 Ukuran Anak</div>
     <div style="font-size:12px;font-weight:700;color:var(--text-secondary)">Size 2–8 Thn</div>
     ${kidsTierControls('A', eDiscA, ePanjangA, eRibA)}
