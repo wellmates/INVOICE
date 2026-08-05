@@ -2387,11 +2387,11 @@ function renderSizeGrid() {
       <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}" oninput="recalculate()"></td>
       <td>
         <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_P" oninput="recalculate()">
-        <input class="size-price-mini" type="number" inputmode="numeric" id="add-${s.code}_P" placeholder="+${fmt(PANJANG_ADD)}rb" oninput="recalculate()" title="Harga tambahan khusus Panjang ${s.label} — kosongkan utk default">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="add-${s.code}_P" placeholder="+${fmt(s.add + PANJANG_ADD)}rb" oninput="recalculate()" title="Harga tambahan khusus Panjang ${s.label} — kosongkan utk default (surcharge size + ${fmt(PANJANG_ADD)}rb)">
       </td>
       <td>
         <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_PR" oninput="recalculate()">
-        <input class="size-price-mini" type="number" inputmode="numeric" id="add-${s.code}_PR" placeholder="+${fmt(PANJANG_RIB_ADD)}rb" oninput="recalculate()" title="Harga tambahan khusus Pjg+Rib ${s.label} — kosongkan utk default">
+        <input class="size-price-mini" type="number" inputmode="numeric" id="add-${s.code}_PR" placeholder="+${fmt(s.add + PANJANG_RIB_ADD)}rb" oninput="recalculate()" title="Harga tambahan khusus Pjg+Rib ${s.label} — kosongkan utk default (surcharge size + ${fmt(PANJANG_RIB_ADD)}rb)">
       </td>
     </tr>`;
   });
