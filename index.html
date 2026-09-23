@@ -2199,6 +2199,8 @@ function snapshotActiveGroup() {
   g.qtys = qtys;
   const addOverrides = {};
   SIZE_BASE.forEach(s => {
+    const el = document.getElementById('add-' + s.code);
+    if (el && el.value !== '') addOverrides[s.code] = parseFloat(el.value) || 0;
     const elP = document.getElementById('add-' + s.code + '_P');
     if (elP && elP.value !== '') addOverrides[s.code + '_P'] = parseFloat(elP.value) || 0;
     const elPR = document.getElementById('add-' + s.code + '_PR');
@@ -2377,6 +2379,9 @@ function renderSizeGrid() {
   let rows = '';
   SIZE_BASE.forEach(s => {
     const badge = s.add > 0 ? `<span class="size-row-add">+${fmt(s.add)}rb</span>` : '';
+    const pendekAddInput = s.add > 0
+      ? `<input class="size-price-mini" type="number" inputmode="numeric" id="add-${s.code}" placeholder="+${fmt(s.add)}rb" oninput="recalculate()" title="Harga tambahan khusus ${s.label} — kosongkan utk default (+${fmt(s.add)}rb)">`
+      : '';
     rows += `<tr>
       <td>
         <div class="size-row-label">
@@ -2384,7 +2389,10 @@ function renderSizeGrid() {
           ${badge}
         </div>
       </td>
-      <td><input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}" oninput="recalculate()"></td>
+      <td>
+        <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}" oninput="recalculate()">
+        ${pendekAddInput}
+      </td>
       <td>
         <input class="size-qty-input" type="number" inputmode="numeric" min="0" placeholder="0" id="qty-${s.code}_P" oninput="recalculate()">
         <input class="size-price-mini" type="number" inputmode="numeric" id="add-${s.code}_P" placeholder="+${fmt(s.add + PANJANG_ADD)}rb" oninput="recalculate()" title="Harga tambahan khusus Panjang ${s.label} — kosongkan utk default (surcharge size + ${fmt(PANJANG_ADD)}rb)">
